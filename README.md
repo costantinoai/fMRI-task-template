@@ -297,6 +297,94 @@ Below are common decimal codes you can copy into your `src/config.m` (provided f
 - Digits: 1=49, 2=50, 3=51, 4=52, 5=53, 6=54, 7=55, 8=56, 9=57, 0=48 (use as 10 if your box labels 10 as 0)
 - Letters/colors: r=114, b=98, g=103, y=121
 - Escape: 27
+### Customizing Your Task
+
+The template is designed for easy customization without modifying core utilities. Most studies customize 1-3 of these common aspects:
+
+#### Level 1: Configuration Only (90% of studies)
+
+**What**: Change timing, response keys, trial structure via `src/config.m` and `src/list_of_stimuli.tsv`.
+
+**When to use**: Standard designs (blocked, event-related, mixed) with image stimuli and binary responses.
+
+**Example**: 2AFC categorization task with 3 runs, 10s fixation blocks
+```matlab
+% In src/config.m:
+params.taskName = 'category';
+params.numRuns = 3;
+params.stimDur = 1.5;  % 1.5s stimulus
+params.fixDur = 2.5;   % 2.5s fixation (4s total per trial)
+params.prePost = 10;   % 10s pre/post fixation blocks
+```
+
+#### Level 2: Custom Trial Logic (Most common)
+
+**What**: Modify trial loop in `fMRI_task.m` to add feedback, rating scales, or conditional displays.
+
+**When to use**: Need visual feedback, multi-button responses, or response-contingent displays.
+
+**Where to edit**: Trial loop section in `fMRI_task.m` (lines ~227-324). Key customization points:
+- **Line ~235**: Stimulus display (`displayTrial` call) - change what's shown
+- **Line ~261-279**: Response collection - change input method (rating scale, multi-button)
+- **After line ~311**: Add feedback display based on response
+
+**Example**: Add visual feedback
+```matlab
+% After line ~311 in fMRI_task.m (after response is stored):
+if isfield(runTrials(i), 'correctAnswer')
+    isCorrect = (runTrials(i).response == runTrials(i).correctAnswer);
+    Screen('FillRect', win, in.gray);
+    if isCorrect
+        DrawFormattedText(win, 'Correct!', 'center', 'center', [0 255 0]);
+    else
+        DrawFormattedText(win, 'Wrong', 'center', 'center', [255 0 0]);
+    end
+    VBL = Screen('Flip', win);
+    logEvent(logFile, 'FLIP', 'Feedback', dateTimeStr, '-', VBL - in.scriptStart, '-', '-');
+    WaitSecs(0.5);
+end
+```
+
+#### Level 3: Custom Trial List Generation
+
+**What**: Create custom trial list builder for complex designs (blocking, counterbalancing, adaptive).
+
+**When to use**: Need blocked designs, custom randomization, or trial-by-trial parameter control.
+
+**How**: Create `src/makeTrialListCustom.m` and call it instead of `makeTrialList` in `fMRI_task.m` line ~131.
+
+**Example**: Blocked design with 3 conditions
+```matlab
+function trialList = makeTrialListCustom(params, in)
+    % Create 3 conditions (A, B, C) in 4 blocks per run
+    trialsPerBlock = 8;
+    conditions = {'condA', 'condB', 'condC', 'condA'};
+    % ... build trial list with block structure
+    % See examples/CUSTOMIZATION_EXAMPLES.md for full code
+end
+```
+
+#### Level 4: Advanced Customization
+
+**What**: Custom instructions, stimulus rendering, or input handling.
+
+**When to use**: Need non-standard displays (movies, real-time rendering) or specialized input devices.
+
+**How**: Create custom display functions in `src/` and call from orchestrator functions.
+
+**Resources**:
+- **Full examples**: See `examples/CUSTOMIZATION_EXAMPLES.md` for 6 complete examples
+- **Quick iteration**: Use `scripts/dev_smoke` for fast 2-trial testing
+- **Architecture**: See `CLAUDE.md` for utilities organization and data flow
+
+#### Customization Tips
+
+1. **Keep study logic in `src/` or main script** - Don't modify `utils/` functions
+2. **Use config for parameters** - Add fields to `src/config.m` instead of hardcoding
+3. **Log custom events** - Use `logEvent(logFile, 'INFO', 'YourEvent', ...)` for analysis
+4. **Test incrementally** - Run `debugMode=true` after each change
+5. **Preserve timing** - Don't alter `idealStimOnset` calculations (needed for drift compensation)
+
 ### First run checklist
 
 - From MATLAB, set your current folder to the repository root.
@@ -307,6 +395,7 @@ Below are common decimal codes you can copy into your `src/config.m` (provided f
   - Optional: up to 10 `buttons` and/or `buttonDecimalCodes` for supported button boxes.
 - Run a smoke test without opening PTB windows: `scripts/quick_check`.
 - Start a debug run: set `debugMode = true` in `fMRI_task.m` and run the script.
+- For quick iteration during development: use `scripts/dev_smoke` (2 trials only, deterministic).
 
 ### Device IDs
 
