@@ -35,7 +35,9 @@ function size = convertVisualUnits(size, varargin)
 %   Author
 %   Andrea Costantino [20/6/24]
 
-% Set default values for optional arguments
+% Set default values for optional arguments. These defaults reflect typical
+% MRI room geometry; callers can override explicitly or opt into
+% useScreenGeometry where we compute px/deg from actual hardware.
 default_values = {'deg','px', 630, 1920, 1080, 340, 190};
 % Check number of input arguments
 num_inputs = length(varargin);
@@ -45,7 +47,7 @@ default_values(1:num_inputs) = varargin;
 [from_unit, to_unit, distance_mm, display_resolution_x, display_resolution_y, display_size_x_mm, display_size_y_mm] = default_values{:};
 % Check that the specified units are valid
 %     assert (any(strcmpi(from_unit, ['mm', 'deg', 'px']&& any(strcmpi(to_unit, ['mm', 'deg', 'px']))))); 'from_unit and to_unit must be mm, deg, or px';
-% Convert size to millimeters
+% Convert size to millimeters (canonical space)
 if strcmpi(from_unit, 'deg')
     % Convert visual angle to radians
     size = deg2rad(size);
@@ -74,5 +76,4 @@ elseif strcmpi(to_unit, 'px')
 end
 
 end
-
 

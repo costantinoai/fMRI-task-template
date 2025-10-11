@@ -45,15 +45,31 @@ if ~isempty(missingFields)
 end
 
 
-% Fetch the stimulus list file and read it
+% Fetch the stimulus list file and read it robustly
 try
-    % Read the TSV file
-    stimListTable = readtable(params.stimListFile, 'Delimiter', '\t', 'FileType', 'text');
-    
+    opts = detectImportOptions(params.stimListFile, 'FileType','text', 'Delimiter','\t');
+    % Preserve original header names (e.g., 'stimuli') without modification
+    try
+        opts.VariableNamingRule = 'preserve';
+    catch
+        % Older MATLAB versions may not support VariableNamingRule; continue
+    end
+    % Set all variables to string to avoid unexpected type coercions
+    try
+        opts = setvartype(opts, opts.VariableNames, 'string');
+    catch
+        % If not supported, proceed with defaults
+    end
+    stimListTable = readtable(params.stimListFile, opts);
 catch exception
-    % Display an error message
-    fprintf('Error reading stimuli list from the TSV file: %s\n', exception.message);
-    
+    error('StimList:ReadFailed', ['Failed to read stimuli list %s: %s. ', ...
+        'Ensure it is a tab-delimited text file with a header row.'], params.stimListFile, exception.message);
+end
+
+% Verify required column
+if ~ismember('stimuli', stimListTable.Properties.VariableNames)
+    error('StimList:MissingColumn', ['The trial list must contain a column named ''stimuli''. ', ...
+        'Edit %s to include a ''stimuli'' column.'], params.stimListFile);
 end
 
 % Duplicate the list of stimuli based on the declared number of repetitions
@@ -61,9 +77,10 @@ stimList = repmat(stimListTable, params.numRepetitions, 1);
 
 % If the total number of trials isn't divisible by the number of runs, 
 % raise an error
-if ~ mod(height(stimList), params.numRuns) == 0
-    error(['Your list of %d trials cannot be divided into %d runs of equal length.', ...
-        height(stimList), params.numRuns]);
+if mod(height(stimList), params.numRuns) ~= 0
+    error('makeTrialList:InvalidRuns', ['Your list of %d trials cannot be divided into %d runs of equal length. ', ...
+        'Adjust either numRuns, numRepetitions, or the stimulus list length to ensure equal runs.'], ...
+        height(stimList), params.numRuns);
 end
 
 
@@ -90,8 +107,6 @@ if isfield(params, 'stimRandomization')
     end
 end
 
-
-
 % If not present yet, add the run number information to the list
 if ismember('run', stimList.Properties.VariableNames)
     % Extract the existing list of run numbers
@@ -104,8 +119,6 @@ elseif ~ismember('run', stimList.Properties.VariableNames)
     % Concatenate the runTable with the stimList table
     stimList = [stimList, runTable];
 end
-
-
 % Calculate the ideal stimulus onset times for one run
 stimOnsetRun= params.prePost:params.trialDur: ...
     (trialsPerRun*params.trialDur)+(params.prePost-params.trialDur);
@@ -118,18 +131,25 @@ end
 % Initiate the trial list as a structure and fill it with information
 trialList = table2struct(stimList);
 
+% Precompute mapping per run to avoid repeated compute
+mapCache = cell(1, params.numRuns);
+for r = 1:params.numRuns
+    mapCache{r} = determineButtonMapping(params, in.subNum, r);
+end
+
 % Add relevant columns to the trial list structure
 for i = 1:numel(trialList)
     % Declare a trial number
     trialList(i).trialNb = i;
     % Declare a run number
     trialList(i).run = runList(i);
-    % Declare a button mapping based on subject and run number
-    trialList(i).butMap = determineButtonMapping(params, in.subNum, trialList(i).run).mapNumber;
-    trialList(i).respKey1 = determineButtonMapping(params, in.subNum, trialList(i).run).respKey1;
-    trialList(i).respKey2 = determineButtonMapping(params, in.subNum, trialList(i).run).respKey2;
-    trialList(i).respInst1 = determineButtonMapping(params, in.subNum, trialList(i).run).respInst1;
-    trialList(i).respInst2 = determineButtonMapping(params, in.subNum, trialList(i).run).respInst2;
+    % Declare a button mapping based on subject and run number (from cache)
+    map = mapCache{trialList(i).run};
+    trialList(i).butMap    = map.mapNumber;
+    trialList(i).respKey1Code = map.respKey1Code;
+    trialList(i).respKey2Code = map.respKey2Code;
+    trialList(i).respInst1 = map.respInst1;
+    trialList(i).respInst2 = map.respInst2;
     % Declare a subject number
     trialList(i).subNum = in.subNum;
     % Declare the ideal stimulus onset times

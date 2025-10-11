@@ -116,9 +116,10 @@ end
 
 % In debug mode, prefer a readable console and less console I/O
     if debugMode
-        try, pretty_console(true); catch, end
-        try, silent_console(true); catch, end
-        try, setappdata(0,'LOG_PRETTY_HEADER_PRINTED', false); catch, end
+    try, pretty_console(true); catch, end
+    % Suppress TSV echo in console without helper scripts
+    try, setappdata(0,'LOG_SILENT_CONSOLE', true); catch, end
+    try, setappdata(0,'LOG_PRETTY_HEADER_PRINTED', false); catch, end
     end
 
 %% USER INPUT: SUBJECT & RUN NUMBER

@@ -1,4 +1,4 @@
-function displayTrial(params, in, runImMat, i, win, winRect)
+function displayTrial(params, in, runImMat, runTrials, i, win, winRect)
 % DISPLAYTRIAL Renders the visual events of a prototypical trial
 %
 %   displayTrial(runImMat, i, win, in, logFile) contains the elements of 
@@ -27,8 +27,21 @@ function displayTrial(params, in, runImMat, i, win, winRect)
 % Fill the screen with gray to reset the background
 Screen('FillRect', win, in.gray);
 
-% Retrieve the image for the current trial from the preloaded image matrix
-imStim = runImMat(i).im;
+% If preloaded, retrieve the image for the current trial
+if ~isempty(runImMat)
+    imStim = runImMat(i).im;
+else
+    % On-demand: determine from trial definition
+    file = runTrials(i).stimuli;
+    if strcmp(file,'fixation')
+        imStim = 'fixation';
+    else
+        imStim = imread(file);
+        if params.resize == true
+            imStim = resizeStim(imStim, params);
+        end
+    end
+end
 
 % If the trial contains a fixation
 if strcmp(imStim, 'fixation')
@@ -41,6 +54,8 @@ else
     
     % Draw the texture on the screen
     Screen('DrawTexture', win, imTexture);
+    % Close the texture to free memory (safe after draw, before flip)
+    Screen('Close', imTexture);
 end
 
 % Uncomment the line below if you wish to show the fixation element on top

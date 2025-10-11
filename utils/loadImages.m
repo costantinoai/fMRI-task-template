@@ -79,9 +79,11 @@ for imNum = 1:length(trialList)
 
 end
 
-% Save the actual pixel width and height of the image
-[imHeight, imWidth, ~] = size(im); % extract the height and width
-params.imHeight = imHeight; % save the image height
-params.imWidth = imWidth; % save the image width
+% Save the actual pixel width and height of the last non-fixation image if available
+if exist('im','var') && ~isempty(im)
+    [imHeight, imWidth, ~] = size(im); % extract the height and width
+    params.imHeight = imHeight; % save the image height
+    params.imWidth = imWidth; % save the image width
+end
 
 end

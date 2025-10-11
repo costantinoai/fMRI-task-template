@@ -40,4 +40,10 @@ if runTrials(trialNum).stimOnset > runTrials(trialNum).idealStimOnset
 elseif runTrials(trialNum).stimOnset < runTrials(trialNum).idealStimOnset
     % Solution: duration of the stimulus = fixation duration + time difference
     adjustedFixDur = params.fixDur + timeDif;
+else
+    % On time: keep fixation duration unchanged
+    adjustedFixDur = params.fixDur;
 end
+
+% Clamp to non-negative
+adjustedFixDur = max(adjustedFixDur, 0);

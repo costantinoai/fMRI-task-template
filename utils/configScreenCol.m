@@ -18,7 +18,9 @@ function [white, gray, black] = configScreenCol(screen)
 %   Tim Maniquet [20/3/24]
 
 
-% Obtain the CLUT index for black.
+% Obtain the CLUT index for black. CLUT values are device-specific and
+% returned by PTB for the currently selected screen. We pass these back to
+% callers so drawing code can use consistent black/gray/white.
 black = BlackIndex(screen);
 
 % Obtain the CLUT index for white.

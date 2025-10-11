@@ -1,4 +1,4 @@
-function [win, winRect, screenNumber, VBLTimestamp] = setupScreen(debugMode)
+function [win, winRect, screenNumber, VBLTimestamp] = setupScreen(debugMode, opts)
 % SETUPSCREEN - Configure the Psychtoolbox graphics window for stimulus presentation.
 %
 %   [win, winRect] = SETUPSCREEN(params, debugMode) configures the graphics window 
@@ -33,16 +33,27 @@ function [win, winRect, screenNumber, VBLTimestamp] = setupScreen(debugMode)
 %   Last updated
 %   Tim Maniquet [15/3/24]
 
+% Default options
+if nargin < 2 || ~isstruct(opts)
+    opts = struct();
+end
+if ~isfield(opts,'windowScale'), opts.windowScale = 0.9; end
+% Note: skipSyncTests applies separately in debug and release blocks below
+
 % Check for debug mode or not
 if debugMode == true
-    % In debug mode, disable sync tests to prevent Psychtoolbox warnings that can interrupt debugging.
-    Screen('Preference', 'SkipSyncTests', 0);
+    % In debug mode, run with sync tests enabled (SkipSyncTests=0) and a slightly smaller window for visibility.
+    if isfield(opts,'skipSyncTests')
+        Screen('Preference', 'SkipSyncTests', opts.skipSyncTests);
+    else
+        Screen('Preference', 'SkipSyncTests', 0);
+    end
     screenNumber = max(Screen('Screens')); % Identify the display screen to use, typically the primary monitor.
     % Extract the screen rectangle size from the selected screen
     windowRect = Screen('Rect', screenNumber);
     % Downsize it by 10% for a clearer view
-    windowRect(3) = round(windowRect(3)*0.9);
-    windowRect(4) = round(windowRect(4)*0.9);
+    windowRect(3) = round(windowRect(3)*opts.windowScale);
+    windowRect(4) = round(windowRect(4)*opts.windowScale);
 
     % Open a window on the specified screen, with the defined size and background color
     % The 'kPsychGUIWindow' flag ensures the window appears with GUI window decorations (title bar, etc.).
@@ -53,7 +64,13 @@ elseif debugMode == false
     % In non-debug mode, prepare the environment for a clean experimental presentation.
     ListenChar(2); % Enable character listening to suppress keypresses showing in MATLAB.
     HideCursor; % Hide the mouse cursor to avoid distractions.
-    Screen('Preference', 'SkipSyncTests', 1); % Still disable sync tests for compatibility.
+    % Skip sync tests (1). Keep as-is for compatibility with existing use cases.
+    % Consider enabling sync tests (0) on your final hardware once validated.
+    if isfield(opts,'skipSyncTests')
+        Screen('Preference', 'SkipSyncTests', opts.skipSyncTests);
+    else
+        Screen('Preference', 'SkipSyncTests', 1);
+    end
     screenNumber = max(Screen('Screens')); % Again, identify the display screen to use.
 
     % Open a full-screen window on the specified screen, with a background color of 0 (black).

@@ -32,12 +32,15 @@ function butMap = determineButtonMapping(params, subNum, runNum)
 %   Tim Maniquet [22/4/24]
 
 % Check if the required fields are present in the params structure
-requiredFields = {'respKey1','respKey2','respInst1','respInst2'};
+requiredFields = {'respKey1Code','respKey2Code','respInst1','respInst2'};
 missingFields = setdiff(requiredFields, fieldnames(params));
 if ~isempty(missingFields)
     error('determineButtonMapping:paramsMissing', 'Required field(s) %s missing in the params structure.', strjoin(missingFields, ', '));
 end
 
+% Decide mapping by subject/run parity. This alternates mapping across
+% subjects and across runs to distribute potential response biases evenly.
+% We operate on decimal key codes only (see TaskConfig + README policy).
 % Check if subject number is even
 if mod(subNum, 2) == 0
     % For even subject numbers, check run number
@@ -59,15 +62,16 @@ else
     end
 end
 
-% Based on the button map from above, switch the response keys or not
+% Based on the selected map, either keep or swap the response codes and
+% instructions. We preserve the instruction-to-key relationship.
 if butMap.mapNumber == 1
-    butMap.respKey1 = params.respKey1; % Keep the order of response keys
-    butMap.respKey2 = params.respKey2;
+    butMap.respKey1Code = params.respKey1Code; % Keep the order of response keys
+    butMap.respKey2Code = params.respKey2Code;
     butMap.respInst1 = params.respInst1; % Keep the order of response instructions
     butMap.respInst2 = params.respInst2;
 elseif butMap.mapNumber == 2
-    butMap.respKey1 = params.respKey2; % Reverse the order of response keys
-    butMap.respKey2 = params.respKey1;
+    butMap.respKey1Code = params.respKey2Code; % Reverse the order of response keys
+    butMap.respKey2Code = params.respKey1Code;
     butMap.respInst1 = params.respInst2; % Reverse the order of response instructions
     butMap.respInst2 = params.respInst1;
 end

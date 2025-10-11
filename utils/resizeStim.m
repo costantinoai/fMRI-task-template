@@ -53,9 +53,14 @@ end
 
 % Check the resize mode
 if strcmpi(params.resizeMode, 'visualUnits')
-    % Convert visual degrees to pixels
-    output_width_pixels = convertVisualUnits(width, 'deg', 'px');
-    output_height_pixels = convertVisualUnits(height, 'deg', 'px');
+    % Convert visual degrees to pixels (optionally use PPD when available)
+    if isfield(params,'useScreenGeometry') && params.useScreenGeometry && isfield(params,'PPD')
+        output_width_pixels = round(width * params.PPD);
+        output_height_pixels = round(height * params.PPD);
+    else
+        output_width_pixels = convertVisualUnits(width, 'deg', 'px');
+        output_height_pixels = convertVisualUnits(height, 'deg', 'px');
+    end
 elseif strcmpi(params.resizeMode, 'pixelSize')
     output_width_pixels = width;
     output_height_pixels = height;

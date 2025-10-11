@@ -1,4 +1,4 @@
-function saveAndClose(params, in, debugMode, runTrials, runImMat, logFile)
+function saveAndClose(params, in, debugMode, runTrials, runImMat, logFile, varargin)
 % SAVEANDCLOSE - Save data and close resources.
 %
 %    Syntax:
@@ -35,20 +35,36 @@ Screen('CloseAll');
 % Enable character listening again
 ListenChar(0);
 
-% If we're not in debug mode, close the log file and save the run data
-if debugMode ~= 1
-    % Close the log file
-    if ~isempty(logFile)
-        fclose(logFile);
+% Release keyboard queues (both default and device-specific if any)
+try, KbQueueRelease(); catch, end
+
+% Optional override to save in debug
+forceSave = false;
+if ~isempty(varargin)
+    forceSave = logical(varargin{1});
+end
+
+% If we're not in debug mode (or forced), close the log file and save the run data
+if debugMode ~= 1 || forceSave
+    try
+        % Close the log file
+        if ~isempty(logFile)
+            fclose(logFile);
+        end
+    catch
+        % Ensure we don't crash on fclose
     end
 
     % Generate a run info tag in the format "sub-xx_run-xx"
     runInfo = ['sub-' zeroFill(in.subNum, 2) '_run-' zeroFill(num2str(in.runNum), 2)];
-    % Use this tag to enerate a unique identifier for the run data
+    % Use this tag to generate a unique identifier for the run data
     dataName = fullfile(in.resDir, [dateTimeStr '_' runInfo '_task-' params.taskName '.mat']);
-    % Save the run data using the unique identifier
-    save(dataName, 'params', 'in', 'runTrials', 'runImMat', '-v7.3');
-    
+    try
+        % Save the run data using the unique identifier
+        save(dataName, 'params', 'in', 'runTrials', 'runImMat', '-v7.3');
+    catch ME
+        warning('Save:Failed', 'Failed to save run data to %s: %s', dataName, ME.message);
+    end
 end
 
 end

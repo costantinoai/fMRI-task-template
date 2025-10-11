@@ -79,9 +79,15 @@ for i = 1:numel(instructionTexts)
 end
 
 
-% Find the place holders and insert the correct buttons where relevant
+% Validate placeholder count and insert the correct buttons
 % Find the occurrences of the placeholder '()'
 idx = strfind(instructionParagraph, '()');
+
+% Enforce exactly two placeholders for clarity and consistency
+if numel(idx) ~= 2
+    error('Instructions:PlaceholderCount', ['Instructions must contain exactly two placeholders ''()'' ', ...
+        'to label the left/right responses. Edit your instructionsText* fields in src/config.m.']);
+end
 
 % Make an array of response instructions to index from
 respInst = {respInst1, respInst2};
