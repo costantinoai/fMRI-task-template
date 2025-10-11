@@ -1,7 +1,7 @@
 classdef testLogEventAndCreateLogFile < matlab.unittest.TestCase
     methods(Test)
         function testCreateAndWrite(testCase)
-            addpath('./utils');
+            addpath(genpath('./utils'));
             params.taskName = 'unittest';
             in.resDir = tempname;
             mkdir(in.resDir);

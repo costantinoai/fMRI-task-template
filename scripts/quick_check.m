@@ -21,7 +21,7 @@ assert(exist(utilsDir, 'dir') == 7, 'Missing utils folder');
 assert(exist(srcDir, 'dir') == 7, 'Missing src folder');
 
 % Add to path
-addpath(utilsDir);
+addpath(genpath(utilsDir)); % Recursively add utils/ subdirectories
 addpath(srcDir);
 
 % Check files

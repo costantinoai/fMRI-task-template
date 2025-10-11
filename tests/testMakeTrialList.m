@@ -1,7 +1,7 @@
 classdef testMakeTrialList < matlab.unittest.TestCase
     methods(Test)
         function testDivisible(testCase)
-            addpath('./utils'); addpath('./src');
+            addpath(genpath('./utils')); addpath('./src');
             params = struct();
             params.stimListFile = 'src/list_of_stimuli.tsv';
             params.numRepetitions = 1;
@@ -22,7 +22,7 @@ classdef testMakeTrialList < matlab.unittest.TestCase
             testCase.verifyEqual(max(runs), params.numRuns);
         end
         function testNotDivisible(testCase)
-            addpath('./utils'); addpath('./src');
+            addpath(genpath('./utils')); addpath('./src');
             params = struct();
             params.stimListFile = 'src/list_of_stimuli.tsv';
             params.numRepetitions = 1;

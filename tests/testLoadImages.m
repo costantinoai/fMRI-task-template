@@ -1,7 +1,7 @@
 classdef testLoadImages < matlab.unittest.TestCase
     methods(Test)
         function testSubsetLoad(testCase)
-            addpath('./utils'); addpath('./src');
+            addpath(genpath('./utils')); addpath('./src');
             % Build a tiny trialList of 2 non-fixation images
             tbl = readtable('src/list_of_stimuli.tsv', 'FileType','text','Delimiter','\t');
             nonfix = ~strcmp(tbl.stimuli, 'fixation');

@@ -1,7 +1,7 @@
 classdef testMakeTrialListMissingColumn < matlab.unittest.TestCase
     methods(Test)
         function testMissingStimuliColumn(testCase)
-            addpath('./utils');
+            addpath(genpath('./utils'));
             % Create a temp TSV without 'stimuli' column
             tmp = [tempname '.tsv'];
             fid = fopen(tmp,'w');

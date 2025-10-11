@@ -1,7 +1,7 @@
 classdef testResizeStimPPD < matlab.unittest.TestCase
     methods(Test)
         function testPPDResize(testCase)
-            addpath('./utils');
+            addpath(genpath('./utils'));
             img = zeros(10,20,3,'uint8');
             params.resizeMode = 'visualUnits';
             params.PPD = 50; % px/deg

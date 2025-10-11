@@ -1,7 +1,7 @@
 classdef testValidateParamsNumeric < matlab.unittest.TestCase
     methods(Test)
         function testNumericOnlyKeys(testCase)
-            addpath('./utils');
+            addpath(genpath('./utils'));
             params = struct();
             params.stimDur=1; params.fixDur=1; params.prePost=1; params.taskName='x';
             params.resize=true; params.numRuns=1; params.stimListFile='src/list_of_stimuli.tsv';
