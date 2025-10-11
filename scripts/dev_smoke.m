@@ -183,7 +183,7 @@ try
         conditionFunc = @(x) (GetSecs - trialStart) <= stimDur;
         [pressedKey, in] = logKeyPressDual(params, in, logFile, false, false, conditionFunc, inputDevs);
 
-        runTrials(i).response = ~isempty(pressedKey) ? pressedKey : NaN;
+        runTrials(i).response = ~isempty(pressedKey);
 
         % Fixation
         Screen('FillRect', win, in.gray);
