@@ -53,34 +53,14 @@ EVN_STIM    = 'Stim';
 EVN_FIX     = 'Fix';
 EVN_POSTFIX = 'Post-fix';
 
-%% CHECK AND SET WORKING DIRECTORY
-% Non-interactive, fail-early setup. If required folders are missing,
-% provide actionable instructions to fix the environment.
+%% SETUP ENVIRONMENT
+% Verify paths and load configuration using setup helpers.
 
-% Declare default directories for the source and utilities
-defaultUtilsDir = './utils';
-defaultSrcDir = './src';
+% Check folders exist and add to MATLAB path
+paths = prepareEnvironment();
 
-% Check if the default utility directory exists
-if ~exist(defaultUtilsDir, 'dir')
-    error('Path:Missing', 'Missing folder %s. Create it (or run from repo root) and retry.', defaultUtilsDir);
-end
-
-% Check if the default source directory exists
-if ~exist(defaultSrcDir , 'dir')
-    error('Path:Missing', 'Missing folder %s. Create it with config/stimuli and retry.', defaultSrcDir);
-end
-
-% Add both directories to the MATLAB path once we're sure they exist
-addpath(fullfile(pwd, 'src'));
-addpath(fullfile(pwd, 'utils'));
-addpath(fullfile(pwd, 'scripts'));
-disp('Directories have been added to the MATLAB path.');
-
-%% IMPORT CONFIG (MATLAB) AND PRODUCE PARAMS
-% Study-specific parameters now live in ./src/config.m by default.
-% The loader converts them into the 'params' structure.
-cfgPath = fullfile(defaultSrcDir, 'config.m');
+% Load experiment configuration
+cfgPath = fullfile(paths.src, 'config.m');
 params = TaskConfig.load(cfgPath, fmriMode);
 
 % Debug policy: when debugMode is true, always use PC codes (buttons/trigger/escape)
@@ -122,61 +102,27 @@ end
     try, setappdata(0,'LOG_PRETTY_HEADER_PRINTED', false); catch, end
     end
 
-%% USER INPUT: SUBJECT & RUN NUMBER
-% Keep subject/run selection visible here to make study control explicit.
+%% SESSION SETUP
+% Get subject/run numbers and prepare session info.
 
-% Declare subject number and decide on the run to start from
-if debugMode == true
-    % Default values for subject & run number in debug mode
+% Get subject and run number (interactive or default for debug)
+if debugMode
     answer = {'99', '1'};
 else
-    % Else if in actual experiment mode
-    prompt = {'subject number', sprintf('Run number (out of %d)', params.numRuns)};
-    % Define empty default answers
-    def = {'', ''};
-    % Collect user input
-    answer = inputdlg(prompt,'',1,def);
+    prompt = {'Subject number', sprintf('Run number (out of %d)', params.numRuns)};
+    answer = inputdlg(prompt, '', 1, {'', ''});
 end
 
-% Store the subject & run number in the 'input' structure
-in.subNum = str2double(answer{1});
-in.runNum = str2double(answer{2});
+subNum = str2double(answer{1});
+runNum = str2double(answer{2});
 
-% Save a timestamp in the input parameters
-in.timestamp = string(datetime('now', 'Format', 'yyyy-MM-dd_HHmmss'));
+% Create session info struct and output directory
+in = prepareSession(subNum, runNum, debugMode);
 
-%% INITIALISE PSYCHOTOOLBOX
-% Initialize PTB and input queues.
-
-% Initialise psychtoolbox (PTB)
-initializePTB();
-
-% Create dedicated input queues for trigger and responses if device IDs
-% are provided. Falls back to default queue if none given.
-if isfield(params, 'triggerDeviceID') && isfield(params, 'responseDeviceID')
-    inputDevs = createInputQueues(params.triggerDeviceID, params.responseDeviceID);
-else
-    inputDevs = createInputQueues([], []);
-end
-
-% Print device bindings for awareness
-if debugMode
-    fprintf('Input devices: trigger=%s, response=%s\n', mat2str(inputDevs.trigger), mat2str(inputDevs.response));
-    fprintf('Tip: run scripts/list_devices to inspect device indices.\n');
-end
-
-%% SETUP A SUBJECT-SPECIFIC RESULTS DIRECTORY
-% All outputs land under data/sub-XX/ with invariant filenames.
-
-% Prepares a subject- and run-specific directory to store outputs
-
-% Make a directory name with subject number if it doesn't exist yet
-in.resDir = fullfile(pwd, 'data', ['sub-' zeroFill(answer{1}, 2)]);
-
-% Check if the results directory exists & if we're not in debug mode
-if exist(in.resDir, 'dir') == 0 && debugMode == false
-    mkdir(in.resDir);
-end
+%% INITIALIZE HARDWARE
+% Setup PTB, screen, input queues, and compute PPD.
+% This must happen AFTER logging starts so screen timing is captured.
+% (Will be called inside try-catch block after logFile is created)
 
 %% LOAD TRIAL LIST & IMAGES
 % Trial list is derived from params + stimuli TSV; images are preloaded.
@@ -207,53 +153,18 @@ logEvent(logFile, 'EVENT_TYPE','EVENT_NAME','DATETIME','EXP_ONSET','ACTUAL_ONSET
 
 % Embed the rest of the script in a try-catch structure to log errors
 try
-    %% SCREEN SETUP
-    
-    % Configure the PTB graphics window based on parameters and debug mode
-    ssOpts = struct();
+    %% HARDWARE INITIALIZATION
+    % Initialize PTB, screen, input queues, and compute PPD
+    [win, winRect, screen, in, inputDevs] = initializeHardware(params, in, fmriMode, debugMode, dbg);
+
+    % Print device info in debug mode
     if debugMode
-        ssOpts.windowScale = dbg.windowScale;
-        if ~isempty(dbg.skipSyncTests), ssOpts.skipSyncTests = dbg.skipSyncTests; end
-    else
-        if isfield(dbg,'releaseSkipSyncTests') && ~isempty(dbg.releaseSkipSyncTests)
-            ssOpts.skipSyncTests = dbg.releaseSkipSyncTests;
-        end
+        fprintf('Input devices: trigger=%s, response=%s\n', mat2str(inputDevs.trigger), mat2str(inputDevs.response));
+        fprintf('Tip: run scripts/list_devices to inspect device indices.\n');
     end
-    [win, winRect, screen, VBLTimestamp] = setupScreen(debugMode, ssOpts);
-    
-    % Store the screen setup time stamp
-    in.scriptStart = VBLTimestamp;
-    
-    % Log the experiment start event with its timestamp
-    logEvent(logFile, 'START','-',dateTimeStr,'-',VBLTimestamp-in.scriptStart,'-','-');
 
-    % Define white, gray, black colours based on the screen
-    [white, gray, black] = configScreenCol(screen);
-    % Add these values to the input parameters
-    in.white = white; in.gray = gray; in.black = black;
-
-    % Turn the screen to gray
-    Screen(win, 'fillrect', gray);
-    
-    % Store the pixels per degree value for use in the setup
-    if isfield(params,'useScreenGeometry') && params.useScreenGeometry
-        % Compute from actual screen geometry
-        scrRect = Screen('Rect', screen);
-        scrWpx = scrRect(3); scrHpx = scrRect(4);
-        scrWmm = params.scrWidth;
-        if isfield(params,'scrHeightMRI') && fmriMode
-            scrHmm = params.scrHeightMRI;
-        elseif isfield(params,'scrHeightPC') && ~fmriMode
-            scrHmm = params.scrHeightPC;
-        else
-            scrHmm = scrWmm * (scrHpx / scrWpx); % estimate from aspect ratio
-        end
-        in.PPD = convertVisualUnits(1, 'deg', 'px', params.scrDist, scrWpx, scrHpx, scrWmm, scrHmm);
-    else
-        in.PPD = convertVisualUnits(1, 'deg', 'px');
-    end
-    % Expose PPD to params for downstream utilities that only see params
-    params.PPD = in.PPD;
+    % Log the experiment start event
+    logEvent(logFile, 'START', '-', dateTimeStr, '-', GetSecs - in.scriptStart, '-', '-');
    
     %% RUN-SPECIFIC PARAMETERS
     
@@ -277,231 +188,158 @@ try
         runImMat = [];
     end
     
-    %% INSTRUCTIONS
-    
-    % Generate the run-specific instructions
-    displayInstructions(win, params, in, respInst1, respInst2);
-    
-    % Optional debug overlay
-    if debugMode && dbg.overlay
-        Screen('TextSize', win, 16);
-        DrawFormattedText(win, sprintf('DEBUG: sub-%02d run-%02d', in.subNum, in.runNum), 15, 15, in.black);
-    end
-    % Display them on screen and log it
-    VBLTimestamp = flipAndLog(win, logFile, in, EVN_INSTR, '-', '-');
-    
-    % Anonymous function that always returns true
-    conditionFunc = @(x) true; 
+    %% TASK EXECUTION - Instructions, Trigger, Fixations, Trials
 
-    % Log the key press confirming participant has read the instructions
-    [~, in] = logKeyPressDual(params, in, logFile, false, true, conditionFunc, inputDevs);
-    if debugMode && isfield(in,'toggleOverlay') && in.toggleOverlay
-        if ~isfield(dbg,'overlay') || ~dbg.overlay
-            dbg.overlay = true;
-        else
-            dbg.overlay = false;
-        end
-        in = rmfield(in,'toggleOverlay');
-    end
-    
-    %% TRIGGER WAIT
-    
-    % Display a message on screen while waiting for the scanner trigger
-    DrawFormattedText(win, params.triggerWaitText, 'center', 'center', black);
-    
-    % Optional debug overlay
-    if debugMode && dbg.overlay
-        Screen('TextSize', win, 16);
-        DrawFormattedText(win, sprintf('DEBUG: waiting trigger  sub-%02d run-%02d', in.subNum, in.runNum), 15, 15, in.black);
-    end
-    % Display the message and log it
-    VBLTimestamp = flipAndLog(win, logFile, in, EVN_TGRWAIT, '-', '-');
-    
-    % Anonymous function that always returns true
-    conditionFunc = @(x) true;
+    % Show instructions and wait for participant
+    [VBL, in] = showInstructions(win, params, in, logFile, respInst1, respInst2, inputDevs, dbg);
 
-    % Trigger policy handling
-    if isfield(params,'triggerPolicy') && strcmpi(params.triggerPolicy, 'single')
-        [~, in] = logKeyPressDual(params, in, logFile, true, false, conditionFunc, inputDevs);
-    elseif isfield(params,'triggerPolicy') && strcmpi(params.triggerPolicy, 'window')
-        [~, in] = logKeyPressDual(params, in, logFile, true, false, conditionFunc, inputDevs);
-        t0 = GetSecs;
-        windowSec = params.triggerWindowMs / 1000;
-        cond = @(x) (GetSecs - t0) <= windowSec;
-        [~, in] = logKeyPressDual(params, in, logFile, true, false, cond, inputDevs);
-    else
-        % default 'double'
-        [~, in] = logKeyPressDual(params, in, logFile, true, false, conditionFunc, inputDevs);
-        [~, in] = logKeyPressDual(params, in, logFile, true, false, conditionFunc, inputDevs);
-    end
-    
-    %% PRE-FIXATION
-    
-    % Show an initial fixation display
-    Screen('FillRect', win, gray); % Fill the screen with gray
-    displayFixation(win, winRect, params, in); % Draw the fixation element
-    
+    % Wait for scanner trigger
+    [VBL, in] = waitForTrigger(win, params, in, logFile, inputDevs, dbg);
+
+    % Pre-run fixation period
+    Screen('FillRect', win, in.gray);
+    displayFixation(win, winRect, params, in);
+
     % Optional debug overlay
     if debugMode && dbg.overlay
         Screen('TextSize', win, 16);
-        DrawFormattedText(win, sprintf('DEBUG: pre-fix sub-%02d run-%02d', in.subNum, in.runNum), 15, 15, in.black);
+        DrawFormattedText(win, sprintf('DEBUG: Pre-fix | sub-%02d run-%02d', in.subNum, in.runNum), 15, 15, in.black);
     end
-    % Display the fixation cross and log it
-    VBLTimestamp = flipAndLog(win, logFile, in, EVN_PREFIX, '-', '-');
-    
-    % Record the trial sequence official starts, immediately after fixation
-    runStart = VBLTimestamp;
-    % Calculate the time elapsed since the script started
+
+    % Flip and log
+    VBL = Screen('Flip', win);
+    logEvent(logFile, 'FLIP', EVN_PREFIX, dateTimeStr, '-', VBL - in.scriptStart, '-', '-');
+
+    % Record run start time (for ideal onset calculations)
+    runStart = VBL;
+    % Calculate the time elapsed since the script started (for adjusting ideal onsets)
     preRunTime = runStart - in.scriptStart;
-    
+
     % Anonymous function to wait for the duration of the pre-trial fixation
-    conditionFunc = @(x) (GetSecs - runStart) <= params.prePost;
+    conditionFunc = @(x) (GetSecs - runStart) <= (params.prePost * dbg.slowMoFactor);
 
     % Wait for and log any key presses during the fixation period
     [~, in] = logKeyPressDual(params, in, logFile, false, false, conditionFunc, inputDevs);
     if debugMode && isfield(in,'toggleOverlay') && in.toggleOverlay
         dbg.overlay = ~dbg.overlay; in = rmfield(in,'toggleOverlay');
     end
-    
+
     %% TRIAL LOOP
-    
     % Loop through the run trials, presenting stimuli and recording responses
     for i = 1:length(runTrials)
         %% Trial timing
-        
-        % Record the start time of the current trial for timing calculations
         trialStart = GetSecs;
 
-        % Calculate and store the onset time (relative to the pre-stim fixation block)
-        runTrials(i).stimOnset = trialStart - runStart;
+        % Adjust trial's ideal onset to account for pre-trigger delays
+        runTrials(i).idealStimOnset = preRunTime + runTrials(i).idealStimOnset;
 
-        % Adjust fixation duration based on the timing of this trial relative to its scheduled time.
-        % (recomputed later with effective debug durations)
-        fixDur = adjustFixationDuration(runTrials, i, params);
-    
         %% Stimulus presentation
-        
-        % Display the stimulus on screen based on the displayTrial function
-        displayTrial(params, in, runImMat, runTrials, i, win, winRect);
+        % Clear screen to gray background
+        Screen('FillRect', win, in.gray);
+
+        % Display the stimulus image
+        if ~isempty(runImMat) && i <= numel(runImMat)
+            currentImage = runImMat(i);
+        else
+            currentImage = [];
+        end
+        displayTrial(params, in, currentImage, runTrials(i), 1, win, winRect);
 
         % Optional debug overlay
         if debugMode && dbg.overlay
             Screen('TextSize', win, 16);
-            DrawFormattedText(win, sprintf('DEBUG: trial %d', i), 15, 15, in.black);
+            DrawFormattedText(win, sprintf('DEBUG: trial %d | %s', i, runTrials(i).stimuli), 15, 15, in.black);
         end
-        % Flip the screen and log the stimulus event
-        idealStimOnset = preRunTime + runTrials(i).idealStimOnset;
-        VBLTimestamp = flipAndLog(win, logFile, in, EVN_STIM, idealStimOnset, runTrials(i).stimuli);
 
-        % Store the ideal and the actual onset values in the trial list
-        runTrials(i).idealStimOnset = idealStimOnset;
-        actualStimOnset = VBLTimestamp - in.scriptStart;
+        % Flip to screen and log event
+        VBL = Screen('Flip', win);
+        actualStimOnset = VBL - in.scriptStart;
+        logEvent(logFile, 'FLIP', EVN_STIM, dateTimeStr, runTrials(i).idealStimOnset, actualStimOnset, ...
+            actualStimOnset - runTrials(i).idealStimOnset, runTrials(i).stimuli);
+
+        % Store actual onset for drift compensation
         runTrials(i).stimOnset = actualStimOnset;
-        
-        % Optional drift warning (debug-only)
+
+        % Optional drift warning
         if debugMode && dbg.warnOnDrift
-            delta = actualStimOnset - idealStimOnset;
-            if abs(delta) > (dbg.driftWarnMs/1000)
-                logEvent(logFile, 'WARN','Drift', dateTimeStr, idealStimOnset, actualStimOnset, delta, runTrials(i).stimuli);
+            drift = (actualStimOnset - runTrials(i).idealStimOnset) * 1000; % ms
+            if abs(drift) > dbg.driftWarnMs
+                logEvent(logFile, 'WARN', 'Drift', dateTimeStr, '-', '-', '-', ...
+                    sprintf('Trial %d drifted %.1f ms', i, drift));
             end
         end
-        
-        %% Trial response
-        
-        % Effective durations (debug slow motion)
-        stimDurEff = params.stimDur * dbg.slowMoFactor;
-        fixDurEffParam = params.fixDur * dbg.slowMoFactor; % param baseline
-        paramsEff = params; paramsEff.fixDur = fixDurEffParam;
-        
-        % Anonymous function to wait for the duration of the stimulus duration
-        conditionFunc = @(x) (GetSecs - trialStart) <= stimDurEff;
-        
-        % Record key presses during the stimulus presentation
+
+        %% Response collection
+        % Adjust duration for debug slow-motion
+        stimDur = params.stimDur * dbg.slowMoFactor;
+        conditionFunc = @(x) (GetSecs - trialStart) <= stimDur;
+
+        % Wait for first valid response key (or timeout)
         [pressedKey, in] = logKeyPressDual(params, in, logFile, false, false, conditionFunc, inputDevs);
+
+        % Handle debug overlay toggle
         if debugMode && isfield(in,'toggleOverlay') && in.toggleOverlay
             dbg.overlay = ~dbg.overlay; in = rmfield(in,'toggleOverlay');
         end
 
-        % Store the response in the trial list structure
-        runTrials(i).response = pressedKey;
-        
+        % Store response
+        if ~isempty(pressedKey)
+            runTrials(i).response = pressedKey;
+        else
+            runTrials(i).response = NaN;
+        end
+
         %% Post-stimulus fixation
-        
-        % Fill the screen with gray & show the fixation
-        Screen('FillRect', win, gray);
+        % Clear screen and draw fixation
+        Screen('FillRect', win, in.gray);
         displayFixation(win, winRect, params, in);
+
+        % Calculate adjusted fixation duration (compensates for drift)
+        fixDur = adjustFixationDuration(runTrials, i, params);
+        fixDurAdj = fixDur * dbg.slowMoFactor;
 
         % Optional debug overlay
         if debugMode && dbg.overlay
             Screen('TextSize', win, 16);
-            DrawFormattedText(win, sprintf('DEBUG: fix trial %d', i), 15, 15, in.black);
-        end
-        % Flip the screen and log it
-        VBLTimestamp = flipAndLog(win, logFile, in, EVN_FIX, '-', '-');
-    
-        % Anonymous function to wait for the duration of the post-trial fixation
-        fixDur = adjustFixationDuration(runTrials, i, paramsEff);
-        conditionFunc = @(x) (GetSecs - trialStart) <= stimDurEff + fixDur;
-        
-        % Record key presses during fixation. Here we select only the first response
-        % If the subj responded during the stimulus, we don't record this response
-        if isempty(pressedKey) % If no key press was recorded during the stimulus presentation,
-            % attempt to capture responses during the fixation.
-            [pressedKey, in] = logKeyPressDual(params, in, logFile, false, false, conditionFunc, inputDevs);
-            if debugMode && isfield(in,'toggleOverlay') && in.toggleOverlay
-                dbg.overlay = ~dbg.overlay; in = rmfield(in,'toggleOverlay');
-            end
-        else
-            % Otherwise, continue to log any additional key presses (first response was already recorded).
-            [~, in] = logKeyPressDual(params, in, logFile, false, false, conditionFunc, inputDevs);
-            if debugMode && isfield(in,'toggleOverlay') && in.toggleOverlay
-                dbg.overlay = ~dbg.overlay; in = rmfield(in,'toggleOverlay');
-            end
-        end
-    
-        % Store the response (if any) in the trial list for later analysis.
-        if ~isempty(pressedKey)
-            runTrials(i).response = pressedKey; % Update the trial list with the key press identifier.
+            DrawFormattedText(win, sprintf('DEBUG: fixation (%.2fs)', fixDurAdj), 15, 15, in.black);
         end
 
-        %% Trial accuracy
+        % Flip fixation to screen and log
+        VBL = Screen('Flip', win);
+        logEvent(logFile, 'FLIP', EVN_FIX, dateTimeStr, '-', VBL - in.scriptStart, '-', '-');
 
-        % % This is a working zone showing how you can record trial accuracy
-        % % It is commented out by default; uncommented it to see the demo
-        % % Fetch the correct key based on the current button mapping
-        % if strcmp(runTrials(i).setting, 'inside')
-        %     corrKey = respKey1;
-        % elseif strcmp(runTrials(i).setting, 'outside')
-        %     corrKey = respKey2;
-        % else
-        %     corrKey = NaN;
-        % end
-        % % Calculate accuracy based on the current pressed key
-        % accuracy = corrKey == pressedKey;
-        % % Log the accuracy in the console
-        % fprintf(1, 'Trial %d accuracy = %d\n', i, accuracy);
+        % Wait for fixation duration and log any additional key presses
+        conditionFunc = @(x) (GetSecs - VBL) <= fixDurAdj;
+        [additionalKey, in] = logKeyPressDual(params, in, logFile, false, false, conditionFunc, inputDevs);
 
+        % Handle debug overlay toggle
+        if debugMode && isfield(in,'toggleOverlay') && in.toggleOverlay
+            dbg.overlay = ~dbg.overlay; in = rmfield(in,'toggleOverlay');
+        end
+
+        % Update response if participant responded during fixation (and hadn't responded yet)
+        if isnan(runTrials(i).response) && ~isempty(additionalKey)
+            runTrials(i).response = additionalKey;
+        end
     end
     
     %% FINAL FIXATION
-    
-    % Fill the screen with gray to reset the background
-    Screen('FillRect', win, gray);
-    % Draw the final fixation cross
+    % Post-run fixation period
+    Screen('FillRect', win, in.gray);
     displayFixation(win, winRect, params, in);
 
     % Optional debug overlay
     if debugMode && dbg.overlay
         Screen('TextSize', win, 16);
-        DrawFormattedText(win, sprintf('DEBUG: post-fix sub-%02d run-%02d', in.subNum, in.runNum), 15, 15, in.black);
+        DrawFormattedText(win, sprintf('DEBUG: Post-fix | sub-%02d run-%02d', in.subNum, in.runNum), 15, 15, in.black);
     end
-    % Flip the screen and log it
-    PostFixFlip = flipAndLog(win, logFile, in, EVN_POSTFIX, '-', '-');
-    
-    % Anonymous function to wait for the duration of the final fixation
-    conditionFunc = @(x) (GetSecs - PostFixFlip) <= params.prePost;
 
-    % Record any key presses during this final fixation period, ensuring all participant responses are captured
+    % Flip and log
+    PostFixFlip = Screen('Flip', win);
+    logEvent(logFile, 'FLIP', EVN_POSTFIX, dateTimeStr, '-', PostFixFlip - in.scriptStart, '-', '-');
+
+    % Record any key presses during this final fixation period
+    conditionFunc = @(x) (GetSecs - PostFixFlip) <= (params.prePost * dbg.slowMoFactor);
     [~, in] = logKeyPressDual(params, in, logFile, false, false, conditionFunc, inputDevs);
     if debugMode && isfield(in,'toggleOverlay') && in.toggleOverlay
         dbg.overlay = ~dbg.overlay; in = rmfield(in,'toggleOverlay');
