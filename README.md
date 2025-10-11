@@ -29,7 +29,6 @@ The structure & most of the ideas for this repo come from work by [@costantinoai
     ├── createInputQueues.m
     ├── createLogFile.m
     ├── dateTimeStr.m
-    ├── detectKeyboard.m
     ├── determineButtonMapping.m
     ├── displayFixation.m
     ├── displayInstructions.m
