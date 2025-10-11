@@ -22,28 +22,37 @@ The structure & most of the ideas for this repo come from work by [@costantinoai
 │   └── stimuli
 │       └── your images here ...
 └── utils
-    ├── TaskConfig.m
-    ├── adjustFixationDuration.m
-    ├── configScreenCol.m
-    ├── convertVisualUnits.m
-    ├── createInputQueues.m
-    ├── createLogFile.m
-    ├── dateTimeStr.m
-    ├── determineButtonMapping.m
-    ├── displayFixation.m
-    ├── displayInstructions.m
-    ├── displayTrial.m
-    ├── flipAndLog.m
-    ├── initializePTB.m
-    ├── loadImages.m
-    ├── logEvent.m
-    ├── logKeyPressDual.m
-    ├── makeTrialList.m
-    ├── resizeStim.m
-    ├── saveAndClose.m
-    ├── setupScreen.m
-    ├── validateParams.m
-    └── zeroFill.m
+    ├── setup/          # Experiment configuration & trial design
+    │   ├── TaskConfig.m
+    │   ├── validateParams.m
+    │   ├── validateInstructionPlaceholders.m
+    │   ├── makeTrialList.m
+    │   ├── validateTrialList.m
+    │   ├── determineButtonMapping.m
+    │   └── loadImages.m
+    ├── display/        # Screen rendering & visual presentation
+    │   ├── displayInstructions.m
+    │   ├── displayTrial.m
+    │   ├── displayFixation.m
+    │   ├── flipAndLog.m
+    │   └── resizeStim.m
+    ├── recording/      # Data logging & response tracking
+    │   ├── createLogFile.m
+    │   ├── logEvent.m
+    │   ├── logKeyPressDual.m
+    │   ├── shouldSuppress.m
+    │   └── saveAndClose.m
+    ├── hardware/       # PTB initialization & device management
+    │   ├── initializePTB.m
+    │   ├── setupScreen.m
+    │   ├── configScreenCol.m
+    │   ├── createInputQueues.m
+    │   └── listDevices.m
+    └── lib/            # Generic helper utilities
+        ├── dateTimeStr.m
+        ├── zeroFill.m
+        ├── convertVisualUnits.m
+        └── adjustFixationDuration.m
 ```
 
 
