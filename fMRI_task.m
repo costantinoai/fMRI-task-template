@@ -14,7 +14,7 @@
 %    screen, and to avoid saving results.
 %  - Turn 'fmriMode' on to read the scanner trigger and response buttons,
 %    and use the scanner screen distance and width properties.
-%  - Turn on the 'macMode' if you're running this script on a mac.
+% 
 % 
 % The structure & most of the ideas for this script are from previous code 
 % from Andrea Costantino & Laura Van Hove. It was adapted to a general
@@ -28,6 +28,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% CLEANUP & SET MODES
+% Study-specific entrypoint: configure modes and any per-study choices here.
+% Utilities in ./utils are generic; keep study semantics in this file.
 
 % Clean up the environment
 clc; % Clear the Command Window.
@@ -38,45 +40,89 @@ clear; % Clear all variables from the workspace.
 cleanObj = onCleanup(@()sca);
 
 % Decide on the debugMode and PC mode
-debugMode = false; % debugMode mode flag. Set to false for actual experiment runs.
+debugMode = true; % debugMode mode flag. Set to false for actual experiment runs.
 fmriMode = false; % Computer mode flag. Set to true whenrunning on the fMRI scanner computer.
 
-% If you're running on mac, use this flag
-macMode = true;
+% (Device IDs are configured via src/config.m)
+
+% Event name constants (for consistency)
+EVN_INSTR   = 'Instr';
+EVN_TGRWAIT = 'TgrWait';
+EVN_PREFIX  = 'Pre-fix';
+EVN_STIM    = 'Stim';
+EVN_FIX     = 'Fix';
+EVN_POSTFIX = 'Post-fix';
 
 %% CHECK AND SET WORKING DIRECTORY
+% Non-interactive, fail-early setup. If required folders are missing,
+% provide actionable instructions to fix the environment.
 
 % Declare default directories for the source and utilities
 defaultUtilsDir = './utils';
 defaultSrcDir = './src';
 
 % Check if the default utility directory exists
-while ~exist(defaultUtilsDir, 'dir')
-    disp(['Utility directory "', defaultUtilsDir, '" does not exist.']);
-    % Prompt the user to input the utility directory
-    utilsDir = input('Please provide the path to the utility directory: ', 's');
-    defaultUtilsDir = utilsDir;
+if ~exist(defaultUtilsDir, 'dir')
+    error('Path:Missing', 'Missing folder %s. Create it (or run from repo root) and retry.', defaultUtilsDir);
 end
 
 % Check if the default source directory exists
-while ~exist(defaultSrcDir , 'dir')
-    disp(['Source directory "', defaultSrcDir , '" does not exist.']);
-    % Prompt the user to input the source directory
-    srcDir  = input('Please provide the path to the source directory: ', 's');
-    defaultSrcDir  = srcDir;
+if ~exist(defaultSrcDir , 'dir')
+    error('Path:Missing', 'Missing folder %s. Create it with config/stimuli and retry.', defaultSrcDir);
 end
 
 % Add both directories to the MATLAB path once we're sure they exist
-addpath(defaultSrcDir );
-addpath(defaultUtilsDir); 
+addpath(fullfile(pwd, 'src'));
+addpath(fullfile(pwd, 'utils'));
+addpath(fullfile(pwd, 'scripts'));
 disp('Directories have been added to the MATLAB path.');
 
-%% IMPORT EXTERNAL PARAMETERS
+%% IMPORT CONFIG (MATLAB) AND PRODUCE PARAMS
+% Study-specific parameters now live in ./src/config.m by default.
+% The loader converts them into the 'params' structure.
+cfgPath = fullfile(defaultSrcDir, 'config.m');
+params = TaskConfig.load(cfgPath, fmriMode);
 
-% Use the parse parameter function to import all parameters from file
-params = parseParameterFile('parameters.txt', fmriMode);
+% Debug policy: when debugMode is true, always use PC codes (buttons/trigger/escape)
+if debugMode
+    if isfield(params,'buttonsPC') && ~isempty(params.buttonsPC)
+        params.buttons = params.buttonsPC;
+        if numel(params.buttonsPC) >= 2
+            params.respKey1Code = params.buttonsPC(1);
+            params.respKey2Code = params.buttonsPC(2);
+        end
+    end
+    if isfield(params,'triggerKeyPCCode') && ~isempty(params.triggerKeyPCCode)
+        params.triggerKeyCode = params.triggerKeyPCCode;
+    end
+    if isfield(params,'escapeKeyPCCode') && ~isempty(params.escapeKeyPCCode)
+        params.escapeKeyCode = params.escapeKeyPCCode;
+    end
+end
+
+validateParams(params, fmriMode);
+
+% Debug options: defaults + optional overrides from config.debug
+dbg = struct('writeLogs', false, 'saveMat', false, 'windowScale', 0.9, ...
+             'slowMoFactor', 1.0, 'overlay', false, 'skipSyncTests', [], ...
+             'warnOnDrift', false, 'driftWarnMs', 10, 'rngSeed', [], ...
+             'releaseSkipSyncTests', []);
+if isfield(params, 'debug') && isstruct(params.debug)
+    fns = fieldnames(params.debug);
+    for ii=1:numel(fns)
+        dbg.(fns{ii}) = params.debug.(fns{ii});
+    end
+end
+
+% In debug mode, prefer a readable console and less console I/O
+    if debugMode
+        try, pretty_console(true); catch, end
+        try, silent_console(true); catch, end
+        try, setappdata(0,'LOG_PRETTY_HEADER_PRINTED', false); catch, end
+    end
 
 %% USER INPUT: SUBJECT & RUN NUMBER
+% Keep subject/run selection visible here to make study control explicit.
 
 % Declare subject number and decide on the run to start from
 if debugMode == true
@@ -99,18 +145,27 @@ in.runNum = str2double(answer{2});
 in.timestamp = string(datetime('now', 'Format', 'yyyy-MM-dd_HHmmss'));
 
 %% INITIALISE PSYCHOTOOLBOX
+% Initialize PTB and input queues.
 
 % Initialise psychtoolbox (PTB)
-if macMode == true
-    % This is a quick fix for mac users: detect the ID of your keyboard
-    keyboardID = detectKeyboard();
-    % Then use this keyboardID to initialise the keyboard
-    macInitializePTB(keyboardID);
+initializePTB();
+
+% Create dedicated input queues for trigger and responses if device IDs
+% are provided. Falls back to default queue if none given.
+if isfield(params, 'triggerDeviceID') && isfield(params, 'responseDeviceID')
+    inputDevs = createInputQueues(params.triggerDeviceID, params.responseDeviceID);
 else
-    initializePTB();
+    inputDevs = createInputQueues([], []);
+end
+
+% Print device bindings for awareness
+if debugMode
+    fprintf('Input devices: trigger=%s, response=%s\n', mat2str(inputDevs.trigger), mat2str(inputDevs.response));
+    fprintf('Tip: run scripts/list_devices to inspect device indices.\n');
 end
 
 %% SETUP A SUBJECT-SPECIFIC RESULTS DIRECTORY
+% All outputs land under data/sub-XX/ with invariant filenames.
 
 % Prepares a subject- and run-specific directory to store outputs
 
@@ -123,17 +178,22 @@ if exist(in.resDir, 'dir') == 0 && debugMode == false
 end
 
 %% LOAD TRIAL LIST & IMAGES
+% Trial list is derived from params + stimuli TSV; images are preloaded.
 
 % From the parameters (including the list of stimuli), make a trial list
 trialList = makeTrialList(params, in);
+
+% Validate trial list integrity (missing files, malformed rows)
+validateTrialList(trialList);
 
 % From the trial list and parameters, load the images
 imMat = loadImages(trialList, params);
 
 %% START LOGGING
+% Keep the log header and field order unchanged for downstream tools.
 
-% Determine the logging destination based on the debugMode mode
-if debugMode == true
+% Determine the logging destination based on the debugMode and debug config
+if debugMode && ~dbg.writeLogs
     % Log in the command window ('1')
     logFile = 1;
 else
@@ -149,7 +209,16 @@ try
     %% SCREEN SETUP
     
     % Configure the PTB graphics window based on parameters and debug mode
-    [win, winRect, screen, VBLTimestamp] = setupScreen(debugMode);
+    ssOpts = struct();
+    if debugMode
+        ssOpts.windowScale = dbg.windowScale;
+        if ~isempty(dbg.skipSyncTests), ssOpts.skipSyncTests = dbg.skipSyncTests; end
+    else
+        if isfield(dbg,'releaseSkipSyncTests') && ~isempty(dbg.releaseSkipSyncTests)
+            ssOpts.skipSyncTests = dbg.releaseSkipSyncTests;
+        end
+    end
+    [win, winRect, screen, VBLTimestamp] = setupScreen(debugMode, ssOpts);
     
     % Store the screen setup time stamp
     in.scriptStart = VBLTimestamp;
@@ -166,67 +235,103 @@ try
     Screen(win, 'fillrect', gray);
     
     % Store the pixels per degree value for use in the setup
-    in.PPD = convertVisualUnits(1, 'deg', 'px');
+    if isfield(params,'useScreenGeometry') && params.useScreenGeometry
+        % Compute from actual screen geometry
+        scrRect = Screen('Rect', screen);
+        scrWpx = scrRect(3); scrHpx = scrRect(4);
+        scrWmm = params.scrWidth;
+        if isfield(params,'scrHeightMRI') && fmriMode
+            scrHmm = params.scrHeightMRI;
+        elseif isfield(params,'scrHeightPC') && ~fmriMode
+            scrHmm = params.scrHeightPC;
+        else
+            scrHmm = scrWmm * (scrHpx / scrWpx); % estimate from aspect ratio
+        end
+        in.PPD = convertVisualUnits(1, 'deg', 'px', params.scrDist, scrWpx, scrHpx, scrWmm, scrHmm);
+    else
+        in.PPD = convertVisualUnits(1, 'deg', 'px');
+    end
+    % Expose PPD to params for downstream utilities that only see params
+    params.PPD = in.PPD;
    
     %% RUN-SPECIFIC PARAMETERS
     
     % Extract the trials of the run
     runTrials = trialList([trialList.run] == in.runNum);
     
-    % Based on the run number find the response buttons
-    respKey1 = unique([runTrials.respKey1]);
-    respKey2 = unique([runTrials.respKey2]);
-    % List all the response keys and append them to the parameters
-    params.respKeys = [respKey1, respKey2]; % add any value needed in here
+    % Based on the run number find the response buttons (decimal codes)
+    respKey1Code = runTrials(1).respKey1Code;
+    respKey2Code = runTrials(1).respKey2Code;
+    % Response codes for robust comparisons; logs keep readable names
+    params.respKeysCode = [respKey1Code, respKey2Code];
 
     % Based on the run number find the response button instructions
-    respInst1 = unique({runTrials.respInst1});
-    respInst2 = unique({runTrials.respInst2});
+    respInst1 = runTrials(1).respInst1;
+    respInst2 = runTrials(1).respInst2;
     
-    % Extract the images of the run
-    runImMat = imMat.image(runTrials(1).trialNb:runTrials(end).trialNb);
+    % Extract the images of the run (if preloaded)
+    if isfield(params,'preloadImages') && params.preloadImages
+        runImMat = imMat.image(runTrials(1).trialNb:runTrials(end).trialNb);
+    else
+        runImMat = [];
+    end
     
     %% INSTRUCTIONS
     
     % Generate the run-specific instructions
     displayInstructions(win, params, in, respInst1, respInst2);
     
+    % Optional debug overlay
+    if debugMode && dbg.overlay
+        Screen('TextSize', win, 16);
+        DrawFormattedText(win, sprintf('DEBUG: sub-%02d run-%02d', in.subNum, in.runNum), 15, 15, in.black);
+    end
     % Display them on screen and log it
-    [VBLTimestamp, ~, ~, ~] = Screen('Flip', win);
-    % Log this event, recording the time at which the instructions were displayed
-    logEvent(logFile, 'FLIP','Instr', dateTimeStr,'-',VBLTimestamp - in.scriptStart,'-','-');
+    VBLTimestamp = flipAndLog(win, logFile, in, EVN_INSTR, '-', '-');
     
     % Anonymous function that always returns true
     conditionFunc = @(x) true; 
-    
+
     % Log the key press confirming participant has read the instructions
-    if macMode == true
-        macLogKeyPress(params, in, logFile, false, true, conditionFunc, keyboardID);
-    else
-        logKeyPress(params, in, logFile, false, true, conditionFunc);    
-    end    
+    [~, in] = logKeyPressDual(params, in, logFile, false, true, conditionFunc, inputDevs);
+    if debugMode && isfield(in,'toggleOverlay') && in.toggleOverlay
+        if ~isfield(dbg,'overlay') || ~dbg.overlay
+            dbg.overlay = true;
+        else
+            dbg.overlay = false;
+        end
+        in = rmfield(in,'toggleOverlay');
+    end
     
     %% TRIGGER WAIT
     
     % Display a message on screen while waiting for the scanner trigger
     DrawFormattedText(win, params.triggerWaitText, 'center', 'center', black);
     
+    % Optional debug overlay
+    if debugMode && dbg.overlay
+        Screen('TextSize', win, 16);
+        DrawFormattedText(win, sprintf('DEBUG: waiting trigger  sub-%02d run-%02d', in.subNum, in.runNum), 15, 15, in.black);
+    end
     % Display the message and log it
-    [VBLTimestamp, ~, ~, ~] = Screen('Flip', win);
-    % Log the screen flip event, indicating that the experiment is in a trigger-wait state
-    logEvent(logFile, 'FLIP','TgrWait', dateTimeStr,'-',VBLTimestamp - in.scriptStart,'-','-');
+    VBLTimestamp = flipAndLog(win, logFile, in, EVN_TGRWAIT, '-', '-');
     
     % Anonymous function that always returns true
     conditionFunc = @(x) true;
 
-    % Record the trigger signal
-    % ** We record the trigger twice because of a bug where MR8 sends 2 triggers **
-    if macMode == true
-        macLogKeyPress(params, in, logFile, true, false, conditionFunc, keyboardID); % First call to wait for and log the trigger signal.
-        macLogKeyPress(params, in, logFile, true, false, conditionFunc, keyboardID); % Second call, if needed, based on your setup.
+    % Trigger policy handling
+    if isfield(params,'triggerPolicy') && strcmpi(params.triggerPolicy, 'single')
+        [~, in] = logKeyPressDual(params, in, logFile, true, false, conditionFunc, inputDevs);
+    elseif isfield(params,'triggerPolicy') && strcmpi(params.triggerPolicy, 'window')
+        [~, in] = logKeyPressDual(params, in, logFile, true, false, conditionFunc, inputDevs);
+        t0 = GetSecs;
+        windowSec = params.triggerWindowMs / 1000;
+        cond = @(x) (GetSecs - t0) <= windowSec;
+        [~, in] = logKeyPressDual(params, in, logFile, true, false, cond, inputDevs);
     else
-        logKeyPress(params, in, logFile, true, false, conditionFunc); % First call to wait for and log the trigger signal.
-        logKeyPress(params, in, logFile, true, false, conditionFunc); % Second call, if needed, based on your setup.
+        % default 'double'
+        [~, in] = logKeyPressDual(params, in, logFile, true, false, conditionFunc, inputDevs);
+        [~, in] = logKeyPressDual(params, in, logFile, true, false, conditionFunc, inputDevs);
     end
     
     %% PRE-FIXATION
@@ -235,10 +340,13 @@ try
     Screen('FillRect', win, gray); % Fill the screen with gray
     displayFixation(win, winRect, params, in); % Draw the fixation element
     
+    % Optional debug overlay
+    if debugMode && dbg.overlay
+        Screen('TextSize', win, 16);
+        DrawFormattedText(win, sprintf('DEBUG: pre-fix sub-%02d run-%02d', in.subNum, in.runNum), 15, 15, in.black);
+    end
     % Display the fixation cross and log it
-    [VBLTimestamp, ~, ~, ~] = Screen('Flip', win);
-    % Log this fixation display event, marking the onset of the fixation period in the experiment log file.
-    logEvent(logFile, 'FLIP','Pre-fix', dateTimeStr,'-',VBLTimestamp - in.scriptStart,'-','-');
+    VBLTimestamp = flipAndLog(win, logFile, in, EVN_PREFIX, '-', '-');
     
     % Record the trial sequence official starts, immediately after fixation
     runStart = VBLTimestamp;
@@ -249,10 +357,9 @@ try
     conditionFunc = @(x) (GetSecs - runStart) <= params.prePost;
 
     % Wait for and log any key presses during the fixation period
-    if macMode == true
-        macLogKeyPress(params, in, logFile, false, false, conditionFunc, keyboardID);
-    else
-        logKeyPress(params, in, logFile, false, false, conditionFunc);
+    [~, in] = logKeyPressDual(params, in, logFile, false, false, conditionFunc, inputDevs);
+    if debugMode && isfield(in,'toggleOverlay') && in.toggleOverlay
+        dbg.overlay = ~dbg.overlay; in = rmfield(in,'toggleOverlay');
     end
     
     %% TRIAL LOOP
@@ -268,38 +375,50 @@ try
         runTrials(i).stimOnset = trialStart - runStart;
 
         % Adjust fixation duration based on the timing of this trial relative to its scheduled time.
+        % (recomputed later with effective debug durations)
         fixDur = adjustFixationDuration(runTrials, i, params);
     
         %% Stimulus presentation
         
         % Display the stimulus on screen based on the displayTrial function
-        displayTrial(params, in, runImMat, i, win, winRect);
+        displayTrial(params, in, runImMat, runTrials, i, win, winRect);
 
-        % Flip the screen to show the stimulus
-        [VBLTimestamp, ~, ~, ~] = Screen('Flip', win);
-
-        % Calculate actual onset and difference with ideal onset
+        % Optional debug overlay
+        if debugMode && dbg.overlay
+            Screen('TextSize', win, 16);
+            DrawFormattedText(win, sprintf('DEBUG: trial %d', i), 15, 15, in.black);
+        end
+        % Flip the screen and log the stimulus event
         idealStimOnset = preRunTime + runTrials(i).idealStimOnset;
-        actualStimOnset = VBLTimestamp - in.scriptStart;
-        
-        % Log the event with onset values and store it in the trial list
-        logEvent(logFile, 'FLIP','Stim', dateTimeStr,idealStimOnset, actualStimOnset, ...
-            actualStimOnset - idealStimOnset, runTrials(i).stimuli);
-        
+        VBLTimestamp = flipAndLog(win, logFile, in, EVN_STIM, idealStimOnset, runTrials(i).stimuli);
+
         % Store the ideal and the actual onset values in the trial list
         runTrials(i).idealStimOnset = idealStimOnset;
+        actualStimOnset = VBLTimestamp - in.scriptStart;
         runTrials(i).stimOnset = actualStimOnset;
+        
+        % Optional drift warning (debug-only)
+        if debugMode && dbg.warnOnDrift
+            delta = actualStimOnset - idealStimOnset;
+            if abs(delta) > (dbg.driftWarnMs/1000)
+                logEvent(logFile, 'WARN','Drift', dateTimeStr, idealStimOnset, actualStimOnset, delta, runTrials(i).stimuli);
+            end
+        end
         
         %% Trial response
         
+        % Effective durations (debug slow motion)
+        stimDurEff = params.stimDur * dbg.slowMoFactor;
+        fixDurEffParam = params.fixDur * dbg.slowMoFactor; % param baseline
+        paramsEff = params; paramsEff.fixDur = fixDurEffParam;
+        
         % Anonymous function to wait for the duration of the stimulus duration
-        conditionFunc = @(x) (GetSecs - trialStart) <= params.stimDur;
+        conditionFunc = @(x) (GetSecs - trialStart) <= stimDurEff;
         
         % Record key presses during the stimulus presentation
-        if macMode == true
-            pressedKey = macLogKeyPress(params, in, logFile, false, false, conditionFunc, keyboardID);
-        else
-            pressedKey = logKeyPress(params, in, logFile, false, false, conditionFunc);
+        [pressedKey, in] = logKeyPressDual(params, in, logFile, false, false, conditionFunc, inputDevs);
+        if debugMode && isfield(in,'toggleOverlay') && in.toggleOverlay
+            dbg.overlay = ~dbg.overlay; in = rmfield(in,'toggleOverlay');
         end
 
         % Store the response in the trial list structure
@@ -311,28 +430,31 @@ try
         Screen('FillRect', win, gray);
         displayFixation(win, winRect, params, in);
 
+        % Optional debug overlay
+        if debugMode && dbg.overlay
+            Screen('TextSize', win, 16);
+            DrawFormattedText(win, sprintf('DEBUG: fix trial %d', i), 15, 15, in.black);
+        end
         % Flip the screen and log it
-        [VBLTimestamp, ~, ~, ~] = Screen('Flip', win);
-        logEvent(logFile, 'FLIP','Fix', dateTimeStr, '-', VBLTimestamp - in.scriptStart, '-', '-');
+        VBLTimestamp = flipAndLog(win, logFile, in, EVN_FIX, '-', '-');
     
         % Anonymous function to wait for the duration of the post-trial fixation
-        conditionFunc = @(x) (GetSecs - trialStart) <= params.stimDur + fixDur;
+        fixDur = adjustFixationDuration(runTrials, i, paramsEff);
+        conditionFunc = @(x) (GetSecs - trialStart) <= stimDurEff + fixDur;
         
         % Record key presses during fixation. Here we select only the first response
         % If the subj responded during the stimulus, we don't record this response
         if isempty(pressedKey) % If no key press was recorded during the stimulus presentation,
             % attempt to capture responses during the fixation.
-            if macMode == true
-                pressedKey = macLogKeyPress(params, in, logFile, false, false, conditionFunc, keyboardID);
-            else
-                pressedKey = logKeyPress(params, in, logFile, false, false, conditionFunc);
+            [pressedKey, in] = logKeyPressDual(params, in, logFile, false, false, conditionFunc, inputDevs);
+            if debugMode && isfield(in,'toggleOverlay') && in.toggleOverlay
+                dbg.overlay = ~dbg.overlay; in = rmfield(in,'toggleOverlay');
             end
         else
             % Otherwise, continue to log any additional key presses (first response was already recorded).
-            if macMode == true
-                macLogKeyPress(params, in, logFile, false, false, conditionFunc, keyboardID);
-            else
-                logKeyPress(params, in, logFile, false, false, conditionFunc);
+            [~, in] = logKeyPressDual(params, in, logFile, false, false, conditionFunc, inputDevs);
+            if debugMode && isfield(in,'toggleOverlay') && in.toggleOverlay
+                dbg.overlay = ~dbg.overlay; in = rmfield(in,'toggleOverlay');
             end
         end
     
@@ -367,19 +489,21 @@ try
     % Draw the final fixation cross
     displayFixation(win, winRect, params, in);
 
+    % Optional debug overlay
+    if debugMode && dbg.overlay
+        Screen('TextSize', win, 16);
+        DrawFormattedText(win, sprintf('DEBUG: post-fix sub-%02d run-%02d', in.subNum, in.runNum), 15, 15, in.black);
+    end
     % Flip the screen and log it
-    [PostFixFlip, ~, ~, ~] = Screen('Flip', win);
-    % Log the display of the final fixation cross, marking the end of active stimulus presentation.
-    logEvent(logFile, 'FLIP','Post-fix', dateTimeStr, '-', PostFixFlip - in.scriptStart, '-', '-');
+    PostFixFlip = flipAndLog(win, logFile, in, EVN_POSTFIX, '-', '-');
     
     % Anonymous function to wait for the duration of the final fixation
     conditionFunc = @(x) (GetSecs - PostFixFlip) <= params.prePost;
 
     % Record any key presses during this final fixation period, ensuring all participant responses are captured
-    if macMode == true
-        macLogKeyPress(params, in, logFile, false, false, conditionFunc, keyboardID);
-    else
-        logKeyPress(params, in, logFile, false, false, conditionFunc);
+    [~, in] = logKeyPressDual(params, in, logFile, false, false, conditionFunc, inputDevs);
+    if debugMode && isfield(in,'toggleOverlay') && in.toggleOverlay
+        dbg.overlay = ~dbg.overlay; in = rmfield(in,'toggleOverlay');
     end
     
     % Calculate and log the total duration of the run, providing a measure of the entire trial sequence length.
@@ -403,12 +527,14 @@ catch exception
 end
 %% SAVE AND CLOSE
 
-% Log the end of the run
-logEvent(logFile, 'END','-', dateTimeStr, '-', GetSecs-in.scriptStart, '-', '-');
+% Log the end of the run only if timing info exists
+if exist('in','var') && isstruct(in) && isfield(in,'scriptStart')
+    logEvent(logFile, 'END','-', dateTimeStr, '-', GetSecs-in.scriptStart, '-', '-');
+end
 
 % Save the relevant data and close PTB objects
-saveAndClose(params, in, debugMode, runTrials, runImMat, logFile);
-
-
-
-
+safeRunTrials = [];
+if exist('runTrials','var'), safeRunTrials = runTrials; end
+safeImMat = [];
+if exist('runImMat','var'), safeImMat = runImMat; end
+saveAndClose(params, in, debugMode, safeRunTrials, safeImMat, logFile, dbg.saveMat);

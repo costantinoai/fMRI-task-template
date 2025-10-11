@@ -28,7 +28,8 @@ function displayFixation(win, winRect, params, in)
 requiredFields = {'fixSize', 'fixType'};
 missingFields = setdiff(requiredFields, fieldnames(params));
 if ~isempty(missingFields)
-    error('createLogFile:paramsMissing', 'Required field(s) %s missing in the params structure.', strjoin(missingFields, ', '));
+    error('DisplayFixation:ParamsMissing', ['Required field(s) %s missing in the params structure. ', ...
+        'Set these in src/config.m.'], strjoin(missingFields, ', '));
 end
 
 % If the user asked for a 'round' type of fixation
@@ -44,7 +45,11 @@ if strcmp(params.fixType, 'round')
     rectSize = [outElement midElement centerElement];
     
     % Convert the element sizes from to pixels
-    fixSize = round(convertVisualUnits(rectSize, 'deg', 'px')); 
+    if isfield(params,'useScreenGeometry') && params.useScreenGeometry && isfield(in,'PPD')
+        fixSize = round(rectSize .* in.PPD);
+    else
+        fixSize = round(convertVisualUnits(rectSize, 'deg', 'px'));
+    end 
     
     % Initialize an array to store rectangle coordinates for drawing the fixation point
     fixRect = zeros(4, length(fixSize));
@@ -75,7 +80,11 @@ elseif strcmp(params.fixType, 'cross')
     fixCol = in.black;
     
     % Define the size and position of the fixation cross (in pixels)
-    crossLength = round(convertVisualUnits(params.fixSize, 'deg', 'px')); % Length of each arm of the cross
+    if isfield(params,'useScreenGeometry') && params.useScreenGeometry && isfield(in,'PPD')
+        crossLength = round(params.fixSize * in.PPD);
+    else
+        crossLength = round(convertVisualUnits(params.fixSize, 'deg', 'px'));
+    end % Length of each arm of the cross
     crossWidth = round(crossLength/10); % Width of the cross lines
     centerX = winRect(3) / 2;
     centerY = winRect(4) / 2;

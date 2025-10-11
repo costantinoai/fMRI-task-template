@@ -9,20 +9,24 @@ The structure & most of the ideas for this repo come from work by [@costantinoai
 ```
 .
 ├── data
-│   └── sub-01
-│       └── ...
+│   └── sub-01
+│       └── ...
 ├── fMRI_task.m
 ├── README.md
+├── scripts
+│   └── quick_check.m
 ├── src
-│   ├── list_of_stimuli.tsv
-│   ├── parameters.txt
-│   ├── readme_files
-│   └── stimuli
-│       └── your images here ...
+│   ├── list_of_stimuli.tsv
+│   ├── config.m
+│   ├── readme_files
+│   └── stimuli
+│       └── your images here ...
 └── utils
+    ├── TaskConfig.m
     ├── adjustFixationDuration.m
     ├── configScreenCol.m
     ├── convertVisualUnits.m
+    ├── createInputQueues.m
     ├── createLogFile.m
     ├── dateTimeStr.m
     ├── detectKeyboard.m
@@ -30,17 +34,16 @@ The structure & most of the ideas for this repo come from work by [@costantinoai
     ├── displayFixation.m
     ├── displayInstructions.m
     ├── displayTrial.m
+    ├── flipAndLog.m
     ├── initializePTB.m
     ├── loadImages.m
     ├── logEvent.m
-    ├── logKeyPress.m
-    ├── macInitializePTB.m
-    ├── macLogKeyPress.m
+    ├── logKeyPressDual.m
     ├── makeTrialList.m
-    ├── parseParameterFile.m
     ├── resizeStim.m
     ├── saveAndClose.m
     ├── setupScreen.m
+    ├── validateParams.m
     └── zeroFill.m
 ```
 
@@ -51,24 +54,28 @@ Make sure the following exist in your root directory:
 
  - A `utils` folder containing utility functions.
  - A `src` folder containing all your stimuli in `src/stimuli`.
- - A `parameters.txt` file in the `src` directory, containing your experimental parameters.
- - A `list_of_stimuli.tsv` file in the `src` directory, containing a list of your trial stimuli & other relevant variables.
+- A `config.m` file in the `src` directory, returning a struct of experimental parameters.
+  - A `list_of_stimuli.tsv` file in the `src` directory, containing a list of your trial stimuli & other relevant variables.
 
-Before starting your experiment, make sure you set the flags `debugMode`, `macMode` and `fmriMode`. These will determine a number of things:
+Before starting your experiment, make sure you set the flags `debugMode` and `fmriMode`. These will determine a number of things:
 
 - `debugMode` should be turned on if you are still developing. It will make your experiment run in a window instead of full screen, and will prevent data from being saved. Switching it off will make the cursor disappear for the time of the experiment, have it run in full screen, and save all result and log all the data.
-- `macMode` should be turned on if you are developing on a mac. Its purpose is to make the logging of key presses work reliably on mac systems.
 - `fmriMode` will have the fMRI screen properties, response & trigger buttons, and response instruction values used. Switching it off will turn these parameters to their PC values.
 
-About the `macMode`: note that Psychtoolbox is not optimised for Mac systems, and surely isn't maintained anymore on macOS in newest versions (as of early 2025). Remember to always try out your script on a Windows machine, or best on the fMRI computer itself, before scanning. The `macMode` flag will have the following effects:
-  - **Keyboard detection**: `detectKeyboard` will be ran to find which keyboard will be sending input during the task and return a _keyboardID_. This is which is crucial as PTB and mac don't see to agree on how to decide on that.
-  - **key presses**: `macLogKeyPress` will be used instead of `logKeyPress`, which is exactly similar except it logs input based on the ID of the detected keyboard.
-  - **Psychtoolbox initialisation**: `macInitializePTB` will be ran instead of `initializePTB`, which will avoid executing `KbName('UnifyKeyNames');` and create & start a queue for the given keyboard ID rather than a general queue.
+Input devices and simultaneous events: configure `deviceIDs.trigger` and `deviceIDs.response` in `src/config.m` to bind queues to specific devices. The template uses dual queues and logs both trigger and response events even when they occur at the same time.
 
 
-### Parameters
+### Configuration (MATLAB)
 
-Most of your experiment parameters will be read externally from the `parameters.txt` file. When you conceive your own task, use this document as a checklist for the elements you need to set. Here is a detailed description of all the parameters you will find in `parameters.txt` and what they do.
+Most of your experiment parameters are read from `src/config.m` via `TaskConfig.load`. Only decimal key codes are allowed (no key names like "q"). Use this section as a checklist for the elements you need to set. The field names match the previous template parameters where possible.
+
+Key code policy
+- Always use decimal key codes for keys and buttons. Do not use key name strings.
+- Examples (ASCII decimal):
+  - Digits 1..9: 49..57; 10th button typically uses 0: 48 (if your box labels 10 as 0)
+  - Letters r,b,g,y: 114, 98, 103, 121
+  - ESC: 27
+- Note: Many button boxes send numeric ASCII codes; verify with `scripts/list_devices` and your hardware docs.
 
 
 | Parameter name | Default value | Description |
@@ -81,6 +88,7 @@ Most of your experiment parameters will be read externally from the `parameters.
 | `resizeMode` | _'visualUnits'_ | If the resize flag is `true`, determines how to resize the images. Two possible values: _visualUnits_ and _pixelSize_ (see [Trial list](#trial-list)). |
 | `outWidth` | `8` | If the resize flag is `true`, the width of your resized stimuli (in pixels or degrees of visual angle, depending on your `resizeMode`. Either one of `outWidth` or `outHeight` has to exist if the `resize` flag is `true`.|
 | `outHeight` | `8` | If the resize flag is `true`, the height of your resized stimuli. |
+| `preloadImages` | `true` | When false, loads each image on demand instead of preloading all at start (saves memory). |
 | `numRuns` | `2` | Total number of runs in the experiment. |
 | `stimListFile` | *'list_of_stimuli.tsv'* | Name of the file that contains a _partial_ or _full_ list of the experiment trials (see [Trial list](#trial-list)).|
 | `numRepetitions` | `2` | How many times to repeat the trials listed in the `stimListFile`. Set to 1 if it contains a full trial list (see [How to write your list of stimuli](#how-to-write-your-list-of-stimuli)). |
@@ -93,14 +101,17 @@ Most of your experiment parameters will be read externally from the `parameters.
 | `triggerWaitText` | *'Experiment loading ...'* | Message to display while the script waits for a trigger to begin the task. |
 | `scrDistMRI` | `630` | Distance to the screen in the MRI scanner (in mm). |
 | `scrWidthMRI` | `340` | Width of the screen in the MRI scanner (in mm). |
+| `scrHeightMRI` | optional | Height of the screen in the MRI scanner (in mm). If omitted, it is estimated from aspect ratio. |
 | `scrDistPC` | `520` | Estimated distance to the PC screen in debug mode (in mm).  |
 | `scrWidthPC` | `510` | Estimated width of the PC screen in debug mode (in mm).|
-| `respKeyMRI1`, `respKeyMRI2` | `3`, `4` | Key codes of the response buttons at the scanner (2-button right & red response box).|
-| `triggerKeyMRI` | `5` | Key code of the MRI trigger.|
-| `respInstMRI1`, `respInstMRI2` | _'left/green'_, _'right/red'_ | Names to display for each key in the instructions at the scanner.|
-| `respKeyPC1`, `respKeyPC2` | _'f'_, _'j'_ | Keyboard response keys in debug mode (will also be used in the instructions). |
-| `triggerKeyPC` | _'t'_ | Mock trigger keyboard key to use in debug mode.|
-| `escapeKey` | _'ESCAPE'_ | Keyboard key to use to abort the experiment.|
+| `scrHeightPC` | optional | Estimated height of the PC screen (in mm). If omitted, it is estimated from aspect ratio. |
+| `useScreenGeometry` | `false` | When true, uses actual screen geometry (px, mm, distance) to compute deg↔px conversions (off by default). |
+| `respKeyMRI1Code`, `respKeyMRI2Code` | `51`, `52` | Decimal codes of the response buttons at the scanner (e.g., '3' and '4').|
+| `triggerKeyMRICode` | `53` | Decimal code of the MRI trigger (e.g., '5').|
+| `respInst1`, `respInst2` | _'left/green'_, _'right/red'_ | Names to display for each key in the instructions at the scanner/PC.|
+| `respKeyPC1Code`, `respKeyPC2Code` | `102`, `106` | Decimal keyboard response codes in debug mode (e.g., 'f' and 'j'). |
+| `triggerKeyPCCode` | `116` | Decimal code of the mock trigger key in debug mode (e.g., 't').|
+| `escapeKeyCode` | `27` | Decimal code of the abort key (ESC).|
 
 
 
@@ -223,26 +234,24 @@ This procedure is reflected in the log files, which contain a `EXP_ONSET` and a 
 ### Response keys
 
 Registering responses correctly is key. Here is how the script handles this aspect of the task:
-- In `parameters.txt`, declare all the response keys **explicitely**. For instance, if you want to use the `J` key, write: `params.respKeyPC1 = 'j'`.
-- After `parseParameterFile` is executed, response keys are be stored as strings in `params`.
-  Here is an example, in which `fmriMode` is `true`:
+- In `src/config.m`, declare your response keys explicitly as decimal codes (not strings). For instance: `respKeyPC1Code = 102` for the `f` key.
+  Example (PC/dev):
   ```
-  parameters.txt            params
-  params.respKey1 = 3       params.respKey1 = '3'
-  params.respKey2 = 4       params.respKey2 = '4'
-  params.triggerKey = 5     params.triggerKey = '5'
+  config.m                  params
+  respKeyPC1Code = 102      params.respKey1Code = 102
+  respKeyPC2Code = 106      params.respKey2Code = 106
+  triggerKeyPCCode = 116    params.triggerKeyCode = 116
   ```
-- When an input is detected, `logKeyPress` (or `macLogKeyPress` if `macMode` is `true`) detects it, find its associated `keyCode`, and compares it to the `KbName` of our keys of interest (trigger key, response key, escape key). It then logs it and, if necessary, takes further action (e.g. close the script if `escape` was pressed).
+- When an input is detected, `logKeyPressDual` polls trigger and response queues, compares decimal key codes against the configured response and trigger keys, and logs the events. It returns the first response key for behavioral data while logging all key presses.
 
 A few more remarks:
-- We turn response keys into strings in `params` because the `keyCodes` we detect correspond to the `KbNames` of the _string_ versions of response keys.
-- Response keys are stored in the params structure at the start of each run as a list.
+- Response keys are represented as decimal codes for matching (see `params.respKeysCode`).
+  Response keys are determined per run and stored as a list of decimal codes:
   ```
-  % Based on the run number find the response buttons
-  respKey1 = unique([runTrials.respKey1]);
-  respKey2 = unique([runTrials.respKey2]);
-  % List all the response keys and append them to the parameters
-  params.respKeys = [respKey1, respKey2]; % add any value needed in here
+  % Response codes for the current run
+  respKey1Code = runTrials(1).respKey1Code;
+  respKey2Code = runTrials(1).respKey2Code;
+  params.respKeysCode = [respKey1Code, respKey2Code];
   ```
   This list is used by `logKeyPress` to compare the received input, and return it only if it is part of the expected response keys. This has the advantage of only returning _one_ behavioural response to the `runTrials` structure that is part of the instructed response buttons (all responses are logged regardless). The list format allows for more response keys to easily be fitted into this logic, which we repeat for every run as the arrangement of keys might change (e.g. left and right button switching across runs).
 
@@ -255,4 +264,42 @@ This section lists the most often encountered bugs and their solution.
 | **Screen Setup** | If you get an error from the `screen setup` section, it might be a problem with the system frame rate and the frame rate detected by PTB. Perhaps you are using an external monitor? If so, try disconnecting the external monitor, or set `SkipSyncTests` to 1 (ATTENTION: DON`T DO THIS IF YOU ARE RUNNING THE REAL EXPERIMENT! ONLY FOR DEBUG PURPOSES). |
 | **Trigger Wait** | There is a known bug currently (as of the 21st of March 2024) where the MRI scanner sends two triggers before beginning. As a result, two keys presses are logged in the trigger wait section, with the start of each run actually taking place after the **second** trigger.|
 | **Keyboard silent** | Did your script crash, and now you cannot write anything in Matlab anymore? Maybe your keyboard is still silent. You need to enable input listening again by running `ListenChar(0)`. Find a way to run that segment, for instance by finding it in `saveAndClose`, highlighting and evaluating it.|
+### Quick check
 
+Run `scripts/quick_check.m` to verify configuration, trial list, and a small image preload without opening a PTB window.
+
+### Debug options (optional)
+
+- `debug.writeLogs`: when true, writes log files in debug mode (default false).
+- `debug.saveMat`: when true, saves `.mat` outputs in debug mode (default false).
+- `debug.windowScale`: scale for the debug window size (default 0.9).
+- `debug.slowMoFactor`: scales `stimDur` and `fixDur` only in debug (default 1.0).
+- `debug.overlay`: draws a small debug overlay text on the screen (default false).
+- `debug.skipSyncTests`: override sync tests in debug (0 or 1). In release, you can set `debug.releaseSkipSyncTests`.
+- `debug.rngSeed`: integer; if set, debug runs are deterministic.
+- `debug.warnOnDrift`: when true, logs a `WARN` line when stimulus onset drift exceeds `debug.driftWarnMs` (default 10 ms). Default false.
+
+Simulating triggers and button presses
+- To simulate scanner triggers and button box responses in debug mode, configure the PC codes in `src/config.m` to the keys you want to press (e.g., `triggerKeyPCCode = 116` for `t`, `respKeyPC1Code = 102` for `f`, `respKeyPC2Code = 106` for `j`). This gives you complete control over what signal you send while using your keyboard.
+
+### Key code reference
+
+Below are common decimal codes you can copy into your `src/config.m` (provided for convenience; verify with your hardware):
+
+- Digits: 1=49, 2=50, 3=51, 4=52, 5=53, 6=54, 7=55, 8=56, 9=57, 0=48 (use as 10 if your box labels 10 as 0)
+- Letters/colors: r=114, b=98, g=103, y=121
+- Escape: 27
+### First run checklist
+
+- From MATLAB, set your current folder to the repository root.
+- Open `src/config.m` and set:
+  - `taskName`, `numRuns`, `numRepetitions` and timing fields (`stimDur`, `fixDur`, `prePost`).
+  - response keys (`respKeyPC1`, `respKeyPC2`, `triggerKeyPC`) for PC/dev mode; MRI keys for scanner.
+  - Optional: `deviceIDs.trigger` and `deviceIDs.response` to bind trigger and response queues (see Device IDs below).
+  - Optional: up to 10 `buttons` and/or `buttonDecimalCodes` for supported button boxes.
+- Run a smoke test without opening PTB windows: `scripts/quick_check`.
+- Start a debug run: set `debugMode = true` in `fMRI_task.m` and run the script.
+
+### Device IDs
+
+Use `scripts/list_devices` to print PsychHID devices and indices. Populate `deviceIDs.trigger` and `deviceIDs.response` in `src/config.m` with these indices to ensure the trigger and response queues listen to the correct devices. The template uses dual queues so simultaneous trigger + button presses are both logged.

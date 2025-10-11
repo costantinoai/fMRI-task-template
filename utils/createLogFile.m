@@ -29,13 +29,15 @@ function logFile = createLogFile(params, in)
 requiredFields = {'taskName'};
 missingFields = setdiff(requiredFields, fieldnames(params));
 if ~isempty(missingFields)
-    error('createLogFile:paramsMissing', 'Required field(s) %s missing in the params structure.', strjoin(missingFields, ', '));
+    error('createLogFile:paramsMissing', ['Required field(s) %s missing in the params structure. ', ...
+        'Set ''taskName'' in src/config.m.'], strjoin(missingFields, ', '));
 end
 
 % Create a run info tag with structure 'sub-xx_run-xx'
 runInfo = ['sub-' zeroFill(in.subNum, 2) '_run-' zeroFill(num2str(in.runNum), 2)];
 
-% Construct a unique log file name using the time stamp run info and task name
+% Construct a unique log file name using the time stamp, run info and task name
+% Keep this naming stable, as downstream tools depend on it.
 logFileName = strcat(dateTimeStr, '_', runInfo, '_task-', params.taskName, '_log.tsv');
 
 % Create a path for the log file in the results folder
