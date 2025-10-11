@@ -137,19 +137,8 @@ validateTrialList(trialList);
 imMat = loadImages(trialList, params);
 
 %% START LOGGING
-% Keep the log header and field order unchanged for downstream tools.
-
-% Determine the logging destination based on the debugMode and debug config
-if debugMode && ~dbg.writeLogs
-    % Log in the command window ('1')
-    logFile = 1;
-else
-    % Create a new run- and subject-dependent log file
-    logFile = createLogFile(params, in);
-end
-
-% Write the header row to the log file, including variable names
-logEvent(logFile, 'EVENT_TYPE','EVENT_NAME','DATETIME','EXP_ONSET','ACTUAL_ONSET','DELTA','EVENT_ID');
+% Create log file and write TSV header
+logFile = initLogging(params, in, debugMode, dbg);
 
 % Embed the rest of the script in a try-catch structure to log errors
 try
@@ -365,15 +354,9 @@ catch exception
 
 end
 %% SAVE AND CLOSE
-
-% Log the end of the run only if timing info exists
-if exist('in','var') && isstruct(in) && isfield(in,'scriptStart')
-    logEvent(logFile, 'END','-', dateTimeStr, '-', GetSecs-in.scriptStart, '-', '-');
-end
-
-% Save the relevant data and close PTB objects
+% Finalize run: log END, save .mat, close PTB
 safeRunTrials = [];
 if exist('runTrials','var'), safeRunTrials = runTrials; end
 safeImMat = [];
 if exist('runImMat','var'), safeImMat = runImMat; end
-saveAndClose(params, in, debugMode, safeRunTrials, safeImMat, logFile, dbg.saveMat);
+finalizeRun(params, in, debugMode, safeRunTrials, safeImMat, logFile, dbg.saveMat);
