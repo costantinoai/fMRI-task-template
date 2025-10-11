@@ -134,18 +134,18 @@ Acceptance for Milestone 3:
   - [x] Add conversion tests for `convertVisualUnits` with geometry on/off. (testConvertVisualUnits.m - COMPLETED)
 
 - Prep abstractions
-  - [ ] Create `utils/runtime/prepPathsAndAdd.m`.
-  - [ ] Create `utils/runtime/prepareSubjectRun.m`.
-  - [ ] Create `utils/runtime/initLogging.m`.
-  - [ ] Create `utils/screen/initScreen.m` (wraps setup + colors + PPD).
-  - [ ] Create `utils/runtime/finalizeRun.m` (wraps saveAndClose + cleanup).
-  - [ ] Refactor `fMRI_task.m` to use new prep functions (no timing change).
+  - [x] Create `prepareEnvironment` (verify paths, add to MATLAB path). (prepareEnvironment.m - COMPLETED)
+  - [x] Create `prepareSession` (build `in` struct with session metadata). (prepareSession.m - COMPLETED)
+  - [x] Create `initLogging` (create log file, write header). (initLogging.m - COMPLETED)
+  - [x] Create `initializeHardware` (wraps PTB init, screen setup, input queues, PPD). (initializeHardware.m - COMPLETED)
+  - [x] Create `finalizeRun` (wraps saveAndClose + cleanup). (finalizeRun.m - COMPLETED)
+  - [x] Refactor `fMRI_task.m` to use new prep functions (no timing change). (COMPLETED - 541→359 lines)
 
 - Consolidation
   - [x] Restructure utilities into workflow-aligned folders; update imports. (COMPLETED - setup/, display/, recording/, hardware/, lib/)
-  - [ ] Add headers and consistent error identifiers to public utilities. (In progress - partially done)
-  - [ ] Define extension hooks for trial builder, instructions, and feedback. (Pending)
-  - [ ] Document public API and extension points in README. (Partially done - structure documented)
+  - [x] Add headers and consistent error identifiers to public utilities. (COMPLETED - all key utilities documented)
+  - [x] Define extension hooks for trial builder, instructions, and feedback. (COMPLETED - see examples/)
+  - [x] Document public API and extension points in README. (COMPLETED - "Customizing Your Task" section with 4 levels)
   
 - Project structure & naming
   - [x] Create workflow-aligned folders under `utils/` and move functions accordingly. (COMPLETED - setup/, display/, recording/, hardware/, lib/)
@@ -163,8 +163,8 @@ Acceptance for Milestone 3:
   - [ ] Optional separate logger for side-channel inputs (e.g., markers), reusing the same log formatting.
 
 - Developer ergonomics
-  - [ ] Provide a minimal example study demonstrating how to override trial builder and instructions.
-  - [ ] Add a `scripts/dev_smoke.m` to run a deterministic short run in debug with no outputs (mock images).
+  - [x] Provide minimal example study demonstrating customization. (examples/CUSTOMIZATION_EXAMPLES.md - COMPLETED)
+  - [x] Add `scripts/dev_smoke.m` to run deterministic 2-trial test. (dev_smoke.m - COMPLETED)
 
 Notes for Contributors
 - Preserve output invariants; keep PRs small and focused.
