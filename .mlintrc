@@ -1,0 +1,48 @@
+% MATLAB Code Analyzer (mlint) configuration for fMRI Task Template
+%
+% This file configures warnings and code quality checks for the project.
+% Place in repository root. MATLAB will automatically use these settings.
+%
+% Usage:
+%   - Automatic: MATLAB Editor uses these settings
+%   - Manual: checkcode('file.m')
+%   - CI: matlab -batch "results = runtests; assert(all([results.Passed]))"
+%
+% Severity levels: error, warning, info, off
+
+% Code Quality
+-*NODEF       % Undefined variable (keep enabled - critical)
+-*NOPRT       % Output suppressed (off - we intentionally suppress outputs)
+off
+-*AGROW       % Array grows inside loop (info - sometimes necessary)
+info
+-*INUSD       % Input unused (info - legacy parameters common)
+info
+-*ASGLU       % Assigned but unused (warning)
+warning
+
+% PTB-Specific
+-*NOPTS       % Missing semicolon (off - PTB functions often have output)
+off
+-*MCFIL       % Filename/function mismatch (error)
+error
+-*NUSED       % Function/variable never used (info - may be API)
+info
+
+% Style
+-*LAXES       % Line too long (info - not critical)
+info
+-*STOUT       % Missing semicolon suppression (off - we want PTB output sometimes)
+off
+
+% Documentation
+-*NCOMM       % No comments (info)
+info
+
+% Best Practices
+-*NOANS       % Suppress ans output (off - dev console useful)
+off
+-*TRYNC       % Try-catch without catch var (warning)
+warning
+-*NOSEM       % Missing semicolon (off for PTB compatibility)
+off

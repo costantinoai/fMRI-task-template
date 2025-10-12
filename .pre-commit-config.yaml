@@ -1,0 +1,36 @@
+# Pre-commit hooks for fMRI Task Template
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.tsv$'  # Keep TSV formatting intact
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=5000']  # Warn on files >5MB
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  - repo: local
+    hooks:
+      - id: matlab-tests
+        name: Run MATLAB tests
+        entry: bash -c 'cd "$GIT_DIR/.." && matlab -batch "run_all_tests; exit(0)"'
+        language: system
+        types: [matlab]
+        pass_filenames: false
+        stages: [commit]
+
+      - id: check-output-invariants
+        name: Check output invariants
+        entry: scripts/check_invariants.sh
+        language: script
+        types: [matlab]
+        pass_filenames: false
+        stages: [commit]
