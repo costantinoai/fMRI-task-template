@@ -43,9 +43,14 @@ if strcmp(params.fixType, 'round')
     
     % Join the three element sizes in an array
     rectSize = [outElement midElement centerElement];
-    
+
     % Convert the element sizes from degrees to pixels
-    fixSize = arrayfun(@(deg) deg2px(deg, params, in), rectSize); 
+    % Use measured PPD if available (from screen geometry), otherwise use defaults
+    if isfield(params, 'useScreenGeometry') && params.useScreenGeometry && isfield(in, 'PPD')
+        fixSize = round(rectSize * in.PPD);
+    else
+        fixSize = arrayfun(@(deg) round(convertVisualUnits(deg, 'deg', 'px')), rectSize);
+    end 
     
     % Initialize an array to store rectangle coordinates for drawing the fixation point
     fixRect = zeros(4, length(fixSize));
@@ -74,9 +79,14 @@ elseif strcmp(params.fixType, 'cross')
     
     % Decide on the colour of the fixation cross
     fixCol = in.black;
-    
+
     % Define the size and position of the fixation cross (in pixels)
-    crossLength = deg2px(params.fixSize, params, in); % Length of each arm of the cross
+    % Convert fixation size from degrees to pixels
+    if isfield(params, 'useScreenGeometry') && params.useScreenGeometry && isfield(in, 'PPD')
+        crossLength = round(params.fixSize * in.PPD);
+    else
+        crossLength = round(convertVisualUnits(params.fixSize, 'deg', 'px'));
+    end
     crossWidth = round(crossLength/10); % Width of the cross lines
     centerX = winRect(3) / 2;
     centerY = winRect(4) / 2;
