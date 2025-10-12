@@ -53,14 +53,17 @@ end
 
 % Check the resize mode
 if strcmpi(params.resizeMode, 'visualUnits')
-    % Convert visual degrees to pixels using deg2px helper
-    % Note: Pass empty 'in' struct for compatibility with loadImages preload phase
-    in_stub = struct();
-    if isfield(params, 'PPD')
-        in_stub.PPD = params.PPD;
+    % Convert visual degrees to pixels
+    % Use measured PPD if available (from screen geometry), otherwise use defaults
+    if isfield(params, 'useScreenGeometry') && params.useScreenGeometry && isfield(params, 'PPD')
+        % Use measured pixels per degree from screen geometry
+        output_width_pixels = round(width * params.PPD);
+        output_height_pixels = round(height * params.PPD);
+    else
+        % Use hardcoded defaults in convertVisualUnits
+        output_width_pixels = round(convertVisualUnits(width, 'deg', 'px'));
+        output_height_pixels = round(convertVisualUnits(height, 'deg', 'px'));
     end
-    output_width_pixels = deg2px(width, params, in_stub);
-    output_height_pixels = deg2px(height, params, in_stub);
 elseif strcmpi(params.resizeMode, 'pixelSize')
     output_width_pixels = width;
     output_height_pixels = height;

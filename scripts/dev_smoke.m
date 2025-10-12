@@ -137,8 +137,7 @@ try
     Screen('FillRect', win, in.gray);
     displayFixation(win, winRect, params, in);
     if dbg.overlay
-        Screen('TextSize', win, 16);
-        DrawFormattedText(win, 'DEBUG: Pre-fix (smoke)', 15, 15, in.black);
+        drawDebugOverlay(win, 'DEBUG: Pre-fix (smoke)', in);
     end
     VBL = Screen('Flip', win);
     logEvent(logFile, 'FLIP', 'Pre-fix', dateTimeStr, '-', VBL - in.scriptStart, '-', '-');
@@ -165,9 +164,8 @@ try
         displayTrial(params, in, currentImage, runTrials(i), 1, win, winRect);
 
         if dbg.overlay
-            Screen('TextSize', win, 16);
-            DrawFormattedText(win, sprintf('SMOKE: trial %d/%d | %s', ...
-                i, length(runTrials), runTrials(i).stimuli), 15, 15, in.black);
+            drawDebugOverlay(win, sprintf('SMOKE: trial %d/%d | %s', ...
+                i, length(runTrials), runTrials(i).stimuli), in);
         end
 
         VBL = Screen('Flip', win);
@@ -190,8 +188,7 @@ try
         fixDurAdj = fixDur * dbg.slowMoFactor;
 
         if dbg.overlay
-            Screen('TextSize', win, 16);
-            DrawFormattedText(win, sprintf('SMOKE: fixation %.2fs', fixDurAdj), 15, 15, in.black);
+            drawDebugOverlay(win, sprintf('SMOKE: fixation %.2fs', fixDurAdj), in);
         end
 
         VBL = Screen('Flip', win);
@@ -209,8 +206,7 @@ try
     Screen('FillRect', win, in.gray);
     displayFixation(win, winRect, params, in);
     if dbg.overlay
-        Screen('TextSize', win, 16);
-        DrawFormattedText(win, 'SMOKE: Post-fix', 15, 15, in.black);
+        drawDebugOverlay(win, 'SMOKE: Post-fix', in);
     end
     PostFixFlip = Screen('Flip', win);
     logEvent(logFile, 'FLIP', 'Post-fix', dateTimeStr, '-', PostFixFlip - in.scriptStart, '-', '-');

@@ -30,22 +30,41 @@ function [win, winRect, screen, in, params] = openScreen(params, in, fmriMode, d
 % Last updated: 2025
 
 try
-    % Build screen setup options
-    ssOpts = struct();
+    % Determine sync test policy based on mode
     if debugMode
-        ssOpts.windowScale = dbg.windowScale;
         if ~isempty(dbg.skipSyncTests)
-            ssOpts.skipSyncTests = dbg.skipSyncTests;
+            Screen('Preference', 'SkipSyncTests', dbg.skipSyncTests);
+        else
+            Screen('Preference', 'SkipSyncTests', 0);
         end
     else
-        % Release mode
+        % Release mode: default to skip=1 unless overridden
         if isfield(dbg, 'releaseSkipSyncTests') && ~isempty(dbg.releaseSkipSyncTests)
-            ssOpts.skipSyncTests = dbg.releaseSkipSyncTests;
+            Screen('Preference', 'SkipSyncTests', dbg.releaseSkipSyncTests);
+        else
+            Screen('Preference', 'SkipSyncTests', 1);
         end
     end
 
-    % Open PTB window
-    [win, winRect, screen, VBLTimestamp] = setupScreen(debugMode, ssOpts);
+    % Select screen (typically primary monitor)
+    screen = max(Screen('Screens'));
+
+    % Open window based on mode
+    if debugMode
+        % Windowed mode: scaled window with GUI decorations for easy debugging
+        windowRect = Screen('Rect', screen);
+        windowRect(3) = round(windowRect(3) * dbg.windowScale);
+        windowRect(4) = round(windowRect(4) * dbg.windowScale);
+        [win, winRect] = Screen('OpenWindow', screen, 0, windowRect, [], [], [], [], [], kPsychGUIWindow);
+    else
+        % Fullscreen mode: hide cursor/keyboard for clean presentation
+        ListenChar(2);
+        HideCursor;
+        [win, winRect] = Screen('OpenWindow', screen, 0);
+    end
+
+    % Get initial flip timestamp (timing reference for all logged events)
+    VBLTimestamp = Screen('Flip', win);
 
 catch ME
     error('Hardware:ScreenFailed', ['Screen setup failed: %s. ', ...
