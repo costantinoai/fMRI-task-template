@@ -27,25 +27,21 @@
 % Tim Maniquet [22/4/24]
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% CLEANUP & SET MODES
-% Study-specific entrypoint: configure modes and any per-study choices here.
-% Utilities in ./utils are generic; keep study semantics in this file.
+%% STUDY-SPECIFIC SETTINGS
+% Configure experiment modes here. All other setup is handled by utilities.
 
 % Clean up the environment
-clc; % Clear the Command Window.
-close all; % Close all figures (except those of imtool.)
-clear; % Clear all variables from the workspace.
+clc;
+close all;
+clear;
+cleanObj = onCleanup(@()sca);  % Ensure PTB window closes on script exit
 
-% Ensure that the screen gets closed when the script terminates.
-cleanObj = onCleanup(@()sca);
+% === EXPERIMENT MODES (change these for your study) ===
+debugMode = true;   % true = windowed mode, PC inputs, pretty console
+fmriMode = false;   % true = fullscreen, MRI inputs, scanner geometry
+% (Device IDs configured in src/config.m)
 
-% Decide on the debugMode and PC mode
-debugMode = true; % debugMode mode flag. Set to false for actual experiment runs.
-fmriMode = false; % Computer mode flag. Set to true whenrunning on the fMRI scanner computer.
-
-% (Device IDs are configured via src/config.m)
-
-% Event name constants (for consistency)
+% Event name constants (used throughout experiment)
 EVN_INSTR   = 'Instr';
 EVN_TGRWAIT = 'TgrWait';
 EVN_PREFIX  = 'Pre-fix';
@@ -53,96 +49,25 @@ EVN_STIM    = 'Stim';
 EVN_FIX     = 'Fix';
 EVN_POSTFIX = 'Post-fix';
 
-%% SETUP ENVIRONMENT
-% Verify paths and load configuration using setup helpers.
+%% INITIALIZE SESSION
+% Load config, setup paths, validate params (all boilerplate consolidated)
+[params, paths, dbg] = initializeSession(debugMode, fmriMode);
 
-% Add utils to path first (prepareEnvironment itself is in utils/)
-addpath(genpath('./utils'));
-
-% Check folders exist and add to MATLAB path
-paths = prepareEnvironment();
-
-% Load experiment configuration
-cfgPath = fullfile(paths.src, 'config.m');
-params = TaskConfig.load(cfgPath, fmriMode);
-
-% Debug policy: when debugMode is true, always use PC codes (buttons/trigger/escape)
-if debugMode
-    % Enable pretty console output in debug mode for better readability
-    setappdata(0, 'LOG_PRETTY_CONSOLE', true);
-    if isfield(params,'buttonsPC') && ~isempty(params.buttonsPC)
-        params.buttons = params.buttonsPC;
-        if numel(params.buttonsPC) >= 2
-            params.respKey1Code = params.buttonsPC(1);
-            params.respKey2Code = params.buttonsPC(2);
-        end
-    end
-    if isfield(params,'triggerKeyPCCode') && ~isempty(params.triggerKeyPCCode)
-        params.triggerKeyCode = params.triggerKeyPCCode;
-    end
-    if isfield(params,'escapeKeyPCCode') && ~isempty(params.escapeKeyPCCode)
-        params.escapeKeyCode = params.escapeKeyPCCode;
-    end
-end
-
-validateParams(params, fmriMode);
-
-% Debug options: defaults + optional overrides from config.debug
-dbg = struct('writeLogs', false, 'saveMat', false, 'windowScale', 0.9, ...
-             'slowMoFactor', 1.0, 'overlay', false, 'skipSyncTests', [], ...
-             'warnOnDrift', false, 'driftWarnMs', 10, 'rngSeed', [], ...
-             'releaseSkipSyncTests', []);
-if isfield(params, 'debug') && isstruct(params.debug)
-    fns = fieldnames(params.debug);
-    for ii=1:numel(fns)
-        dbg.(fns{ii}) = params.debug.(fns{ii});
-    end
-end
-
-% In debug mode, prefer a readable console and less console I/O
-    if debugMode
-    try, pretty_console(true); catch, end
-    % Suppress TSV echo in console without helper scripts
-    try, setappdata(0,'LOG_SILENT_CONSOLE', true); catch, end
-    try, setappdata(0,'LOG_PRETTY_HEADER_PRINTED', false); catch, end
-    end
-
-%% SESSION SETUP
-% Get subject/run numbers and prepare session info.
-
-% Get subject and run number (interactive or default for debug)
-if debugMode
-    answer = {'99', '1'};
-else
-    prompt = {'Subject number', sprintf('Run number (out of %d)', params.numRuns)};
-    answer = inputdlg(prompt, '', 1, {'', ''});
-end
-
-subNum = str2double(answer{1});
-runNum = str2double(answer{2});
+%% GET SUBJECT INFO
+% Prompt for subject/run numbers (or use defaults in debug mode)
+[subNum, runNum] = promptSubjectRun(params, debugMode);
 
 % Create session info struct and output directory
 in = prepareSession(subNum, runNum, debugMode);
 
-%% INITIALIZE HARDWARE
-% Setup PTB, screen, input queues, and compute PPD.
-% This must happen AFTER logging starts so screen timing is captured.
-% (Will be called inside try-catch block after logFile is created)
-
-%% LOAD TRIAL LIST & IMAGES
-% Trial list is derived from params + stimuli TSV; images are preloaded.
-
-% From the parameters (including the list of stimuli), make a trial list
+%% PREPARE EXPERIMENT
+% Build trial list from stimuli TSV, validate, and preload images
 trialList = makeTrialList(params, in);
-
-% Validate trial list integrity (missing files, malformed rows)
 validateTrialList(trialList);
-
-% From the trial list and parameters, load the images
 imMat = loadImages(trialList, params);
 
 %% START LOGGING
-% Create log file and write TSV header
+% Create log file and write TSV header (wraps hardware init in try-catch)
 logFile = createLogFile(params, in, debugMode, dbg);
 
 % Embed the rest of the script in a try-catch structure to log errors
