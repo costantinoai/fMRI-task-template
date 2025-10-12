@@ -109,8 +109,15 @@ end
 logFile = createLogFile(params, in, debugMode, dbg);
 
 try
-    %% HARDWARE INIT
-    [win, winRect, ~, in, inputDevs] = initializeHardware(params, in, fmriMode, debugMode, dbg);
+    %% HARDWARE INIT (4 explicit steps)
+    initPTB();
+    if isfield(params, 'deviceIDs') && isstruct(params.deviceIDs)
+        inputDevs = createInputQueues(params.deviceIDs.trigger, params.deviceIDs.response);
+    else
+        inputDevs = createInputQueues([], []);
+    end
+    [win, winRect, screen, in] = openScreen(debugMode, dbg, in);
+    [in, params] = computePPD(params, in, fmriMode, screen);
 
     fprintf('\n=== Smoke Test Ready ===\n');
     fprintf('Device IDs: trigger=%s, response=%s\n', ...

@@ -12,6 +12,15 @@ cfg.prePost  = 10;   % s
 % --- Task info ---
 cfg.taskName = 'myexp';
 
+% --- Event names (used in logging) ---
+cfg.eventNames = struct();
+cfg.eventNames.instruction = 'Instr';
+cfg.eventNames.triggerWait = 'TgrWait';
+cfg.eventNames.preFix      = 'Pre-fix';
+cfg.eventNames.stimulus    = 'Stim';
+cfg.eventNames.fixation    = 'Fix';
+cfg.eventNames.postFix     = 'Post-fix';
+
 % --- Image resize ---
 cfg.resize     = true;
 cfg.resizeMode = 'visualUnits';   % 'visualUnits' or 'pixelSize'
