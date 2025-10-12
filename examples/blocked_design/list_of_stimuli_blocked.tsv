@@ -1,0 +1,10 @@
+stimuli	condition
+./src/stimuli/vehicle_bike.jpg	condA
+./src/stimuli/vehicle_car.jpg	condA
+./src/stimuli/vehicle_plane.jpg	condA
+./src/stimuli/vehicle_bike.jpg	condB
+./src/stimuli/vehicle_car.jpg	condB
+./src/stimuli/vehicle_plane.jpg	condB
+./src/stimuli/vehicle_bike.jpg	condC
+./src/stimuli/vehicle_car.jpg	condC
+./src/stimuli/vehicle_plane.jpg	condC
