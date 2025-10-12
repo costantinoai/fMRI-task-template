@@ -34,7 +34,12 @@ fprintf('=== DEV SMOKE TEST ===\n');
 fprintf('Quick 2-trial run for development/testing\n\n');
 
 %% ENVIRONMENT & CONFIG
+% Add utils to path first (prepareEnvironment itself is in utils/)
+addpath(genpath('./utils'));
 paths = prepareEnvironment();
+
+% Enable pretty console output for development
+setappdata(0, 'LOG_PRETTY_CONSOLE', true);
 cfgPath = fullfile(paths.src, 'config.m');
 params = TaskConfig.load(cfgPath, fmriMode);
 

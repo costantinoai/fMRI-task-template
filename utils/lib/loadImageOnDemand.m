@@ -57,7 +57,7 @@ end
 
 % Resize if needed
 if isfield(params, 'resize') && params.resize
-    im = resizeStim(im, params, in);
+    im = resizeStim(im, params);
 end
 
 % Store in cache for future use

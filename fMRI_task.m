@@ -56,6 +56,9 @@ EVN_POSTFIX = 'Post-fix';
 %% SETUP ENVIRONMENT
 % Verify paths and load configuration using setup helpers.
 
+% Add utils to path first (prepareEnvironment itself is in utils/)
+addpath(genpath('./utils'));
+
 % Check folders exist and add to MATLAB path
 paths = prepareEnvironment();
 
@@ -65,6 +68,8 @@ params = TaskConfig.load(cfgPath, fmriMode);
 
 % Debug policy: when debugMode is true, always use PC codes (buttons/trigger/escape)
 if debugMode
+    % Enable pretty console output in debug mode for better readability
+    setappdata(0, 'LOG_PRETTY_CONSOLE', true);
     if isfield(params,'buttonsPC') && ~isempty(params.buttonsPC)
         params.buttons = params.buttonsPC;
         if numel(params.buttonsPC) >= 2
