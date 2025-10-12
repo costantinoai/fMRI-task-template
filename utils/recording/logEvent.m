@@ -113,7 +113,10 @@ function line = local_pretty_line(eventType, eventName, dateTime, expOnset, actu
     et = string(eventType); en = string(eventName); dt = string(dateTime);
     expStr = local_fmt(expOnset, 6);
     actStr = local_fmt(actualOnset, 6);
-    delStr = local_fmt(delta, 6);
+
+    % Format delta as milliseconds for readability
+    delStr = local_fmt_delta_ms(delta);
+
     idStr = '-';
     if isnumeric(eventID)
         idStr = sprintf('%d', round(eventID));
@@ -138,6 +141,20 @@ function s = local_fmt(x, nd)
         s = '-';
     else
         s = sprintf('%.*f', nd, x);
+    end
+end
+
+function s = local_fmt_delta_ms(x)
+%LOCAL_FMT_DELTA_MS Format delta as milliseconds (convert from seconds).
+    if ischar(x)
+        if strcmp(x,'-'), s = '-'; return; end
+        x = str2double(x);
+    end
+    if isempty(x) || (isnumeric(x) && isnan(x))
+        s = '-';
+    else
+        % Convert seconds to milliseconds and format with 2 decimal places
+        s = sprintf('%.2f ms', x * 1000);
     end
 end
 
