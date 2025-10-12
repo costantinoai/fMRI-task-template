@@ -32,7 +32,6 @@ cfg.numRuns        = 2;
 cfg.stimListFile   = './src/list_of_stimuli.tsv';
 cfg.numRepetitions = 2;
 cfg.stimRandomization = 'run';    % 'run', 'all', or omit
-cfg.preloadImages  = true;        % when false, load on demand
 
 % --- Fixation & text ---
 cfg.fixSize  = .6;         % deg

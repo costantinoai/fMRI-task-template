@@ -46,7 +46,6 @@ params = TaskConfig.load(cfgPath, fmriMode);
 % Override for quick testing
 params.numRuns = 1;
 params.numRepetitions = 1;  % Will be overridden by trial count
-params.preloadImages = false;  % Faster startup
 params.prePost = 2;  % Shorter fixation periods
 params.stimDur = 1;  % Shorter stimulus
 params.fixDur = 1;  % Shorter fixation
@@ -98,12 +97,8 @@ end
 
 validateTrialList(trialList);
 
-% Load images (only for selected trials)
-if params.preloadImages
-    imMat = loadImages(trialList, params);
-else
-    imMat = struct('image', []);
-end
+% Load images (always preload for smoke test)
+imMat = loadImages(trialList, params);
 
 %% START LOGGING (console only)
 logFile = createLogFile(params, in, debugMode, dbg);
@@ -129,11 +124,7 @@ try
     respInst1 = runTrials(1).respInst1;
     respInst2 = runTrials(1).respInst2;
 
-    if params.preloadImages
-        runImMat = imMat.image(runTrials(1).trialNb:runTrials(end).trialNb);
-    else
-        runImMat = [];
-    end
+    runImMat = imMat.image(runTrials(1).trialNb:runTrials(end).trialNb);
 
     %% TASK EXECUTION
     % Instructions

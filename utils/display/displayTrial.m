@@ -1,36 +1,26 @@
 function displayTrial(params, in, image, trial, ~, win, winRect)
 % DISPLAYTRIAL Renders a single trial's stimulus.
 %
-%   Supports both preloaded images and lazy loading with intelligent caching.
-%   Automatically handles fixation trials and image resizing.
+%   Uses preloaded images (loaded during setup). Automatically handles
+%   fixation trials.
 %
 % Inputs:
-%   params - Experiment parameters (resize, visualUnits, etc.)
-%   in     - Session info (gray, PPD, colors)
-%   image  - Preloaded image struct/matrix OR [] for lazy loading
-%   trial  - Current trial struct (must have 'stimuli' field)
-%   ~      - Unused legacy parameter (kept for backward compatibility)
-%   win    - PTB window pointer
+%   params  - Experiment parameters
+%   in      - Session info (gray, colors)
+%   image   - Preloaded image struct/matrix
+%   trial   - Current trial struct (must have 'stimuli' field)
+%   ~       - Unused legacy parameter
+%   win     - PTB window pointer
 %   winRect - Screen rectangle [x1 y1 x2 y2]
 %
 % Behavior:
-%   - If image is provided (not empty): Use preloaded image
-%   - If image is []: Load on-demand using loadImageOnDemand (with cache)
+%   - Uses preloaded image (from runImMat)
 %   - If stimuli == 'fixation': Display fixation cross instead
 %
-% Performance:
-%   - Preloaded: ~2ms per trial
-%   - Lazy (cached): ~2ms per trial
-%   - Lazy (cache miss): ~100ms first time per unique image
-%
 % Example:
-%   % Preloaded mode:
 %   displayTrial(params, in, runImMat(i), runTrials(i), 1, win, winRect);
 %
-%   % Lazy loading mode:
-%   displayTrial(params, in, [], runTrials(i), 1, win, winRect);
-%
-% See also: loadImageOnDemand, resizeStim, displayFixation
+% See also: displayFixation, loadImages
 %
 % Author: fMRI Task Template Team
 % Last updated: 2025
@@ -38,36 +28,27 @@ function displayTrial(params, in, image, trial, ~, win, winRect)
 % Fill screen with gray background
 Screen('FillRect', win, in.gray);
 
-% Determine image source
+% Extract image matrix from struct or use directly
 if ~isempty(image) && isstruct(image) && isfield(image, 'im')
-    % Preloaded image (struct with 'im' field)
     imStim = image.im;
-elseif ~isempty(image) && ~isstruct(image)
-    % Preloaded image (direct matrix)
+elseif ~isempty(image)
     imStim = image;
 else
-    % Lazy loading: load on-demand with caching
-    stimPath = trial.stimuli;
-
-    if strcmp(stimPath, 'fixation')
+    % Check if this is a fixation trial
+    if isfield(trial, 'stimuli') && strcmp(trial.stimuli, 'fixation')
         imStim = 'fixation';
     else
-        imStim = loadImageOnDemand(stimPath, params, in);
+        error('DisplayTrial:NoImage', 'No image provided for trial. Images must be preloaded.');
     end
 end
 
-% If the trial contains a fixation
-if strcmp(imStim, 'fixation')
-    % Display a fixation element instead of an image
+% Render fixation or stimulus
+if ischar(imStim) && strcmp(imStim, 'fixation')
     displayFixation(win, winRect, params, in);
-
 else
-    % Create a texture from the image for rendering
-    [imTexture] = Screen('MakeTexture', win, imStim);
-    
-    % Draw the texture on the screen
+    % Create texture, draw, and immediately close to free memory
+    imTexture = Screen('MakeTexture', win, imStim);
     Screen('DrawTexture', win, imTexture);
-    % Close the texture to free memory (safe after draw, before flip)
     Screen('Close', imTexture);
 end
 
