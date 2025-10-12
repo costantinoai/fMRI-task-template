@@ -101,7 +101,7 @@ else
 end
 
 %% START LOGGING (console only)
-logFile = initLogging(params, in, debugMode, dbg);
+logFile = createLogFile(params, in, debugMode, dbg);
 
 try
     %% HARDWARE INIT
@@ -231,7 +231,7 @@ catch exception
 end
 
 %% FINALIZE
-finalizeRun(params, in, debugMode, runTrials, [], logFile, false);
+saveAndClose(params, in, debugMode, runTrials, [], logFile, false);
 
 fprintf('\n=== Smoke Test Complete ===\n');
 fprintf('Check console output above for timing and events.\n');

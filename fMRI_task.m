@@ -138,7 +138,7 @@ imMat = loadImages(trialList, params);
 
 %% START LOGGING
 % Create log file and write TSV header
-logFile = initLogging(params, in, debugMode, dbg);
+logFile = createLogFile(params, in, debugMode, dbg);
 
 % Embed the rest of the script in a try-catch structure to log errors
 try
@@ -359,4 +359,4 @@ safeRunTrials = [];
 if exist('runTrials','var'), safeRunTrials = runTrials; end
 safeImMat = [];
 if exist('runImMat','var'), safeImMat = runImMat; end
-finalizeRun(params, in, debugMode, safeRunTrials, safeImMat, logFile, dbg.saveMat);
+saveAndClose(params, in, debugMode, safeRunTrials, safeImMat, logFile, dbg.saveMat);

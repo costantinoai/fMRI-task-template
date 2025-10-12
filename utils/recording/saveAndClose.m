@@ -1,30 +1,36 @@
 function saveAndClose(params, in, debugMode, runTrials, runImMat, logFile, varargin)
-% SAVEANDCLOSE - Save data and close resources.
+% SAVEANDCLOSE Save data and close PTB objects.
 %
-%    Syntax:
-%      SaveAndClose(params, in, debugMode, runTrials, runImMat, logFile)
+%   Logs END event, saves .mat file (if enabled), and closes log file handle.
 %
-%    Inputs:
-%      - params: Struct containing experiment parameters
-%      - in: Struct containing run information.
-%      - runTrials: Array storing info about trials and responses.
-%      - runImMat: Struct storing info about the images (one image per row).
-%      - logFile: File identifier of the log file.
+% Inputs:
+%   params    - Experiment parameters
+%   in        - Session info (scriptStart, subNum, runNum, etc.)
+%   debugMode - If true, skip saving unless saveMat=true
+%   runTrials - Trial list with responses and timings
+%   runImMat  - Preloaded images (or [] if on-demand)
+%   logFile   - Log file handle (1 for console, FID otherwise)
+%   saveMat   - (Optional) Debug option: force save even in debugMode
 %
-%     Description:
-%       This function saves relevant variables and files, and closes 
-%       resources such as the task screen, log file, and input devices. The
-%       variables runTrials and runImMat will be saved in debugMode is
-%       turned off.
+% Errors:
+%   File:CannotSave - Cannot save .mat file to output directory
 %
-%   Example:
-%       SaveAndClose(params, in, runTrials, runImMat, logFile)
-% 
-%   Author
-%   Andrea Costantino [16/6/23]
-% 
-%   Last updated
-%   Tim Maniquet [22/4/24]
+% Example:
+%   saveAndClose(params, in, debugMode, runTrials, runImMat, logFile, dbg.saveMat);
+%
+% Side effects:
+%   - Writes END event to log
+%   - Closes log file (if not console)
+%   - Saves .mat file to data/sub-XX/ (unless debugMode and not saveMat)
+%   - Calls sca (Screen Close All)
+%
+% Author: fMRI Task Template Team
+% Last updated: 2025
+
+% Log end of run if timing info exists
+if exist('in', 'var') && isstruct(in) && isfield(in, 'scriptStart')
+    logEvent(logFile, 'END', '-', dateTimeStr, '-', GetSecs - in.scriptStart, '-', '-');
+end
 
 % Show the mouse cursor again
 ShowCursor;
@@ -56,7 +62,7 @@ if debugMode ~= 1 || forceSave
     end
 
     % Generate a run info tag in the format "sub-xx_run-xx"
-    runInfo = ['sub-' zeroFill(in.subNum, 2) '_run-' zeroFill(num2str(in.runNum), 2)];
+    runInfo = sprintf('sub-%02d_run-%02d', in.subNum, in.runNum);
     % Use this tag to generate a unique identifier for the run data
     dataName = fullfile(in.resDir, [dateTimeStr '_' runInfo '_task-' params.taskName '.mat']);
     try

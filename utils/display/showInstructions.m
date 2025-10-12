@@ -23,10 +23,76 @@ function [VBL, in] = showInstructions(win, params, in, logFile, respInst1, respI
 %   [VBL, in] = showInstructions(win, params, in, logFile, 'left', 'right', inputDevs, dbg);
 %
 % Author: fMRI Task Template Team
-% Last updated: 2024
+% Last updated: 2025
 
-% Draw instructions using existing helper
-displayInstructions(win, params, in, respInst1, respInst2);
+%% Validate inputs
+% Check if the required fields are present in the 'params' structure
+requiredFields = {'textSize', 'textFont', 'instructionsText1'};
+missingFields = setdiff(requiredFields, fieldnames(params));
+if ~isempty(missingFields)
+    error('displayInstructions:paramsMissing', 'Required field(s) %s missing in the params structure.', strjoin(missingFields, ', '));
+end
+
+% Check if the required fields are present in the 'in' structure
+requiredFields = {'black'};
+missingFields = setdiff(requiredFields, fieldnames(in));
+if ~isempty(missingFields)
+    error('displayInstructions:paramsMissing', 'Required field(s) %s missing in the in structure.', strjoin(missingFields, ', '));
+end
+
+%% Extract and merge instruction text
+% Configure text size and font parameters
+Screen('TextSize', win, params.textSize);
+Screen('TextFont', win, params.textFont);
+
+% Get field names of params structure
+paramFieldnames = fieldnames(params);
+
+% Initialize cell array to store fields containing 'instructions'
+instructionTexts = {};
+
+% Iterate through each field name to find instruction text fields
+for i = 1:numel(paramFieldnames)
+    fieldName = paramFieldnames{i};
+    if contains(fieldName, 'instructionsText')
+        instructionTexts{end+1} = params.(fieldName);
+    end
+end
+
+% Merge the instruction sentences into a single paragraph
+instructionParagraph = '';
+for i = 1:numel(instructionTexts)
+    instructionParagraph = [instructionParagraph instructionTexts{i} '\n\n'];
+end
+
+%% Replace placeholders with response instructions
+% Find the occurrences of the placeholder '()'
+idx = strfind(instructionParagraph, '()');
+
+% Enforce exactly two placeholders for clarity and consistency
+if numel(idx) ~= 2
+    error('Instructions:PlaceholderCount', ['Instructions must contain exactly two placeholders ''()'' ', ...
+        'to label the left/right responses. Edit your instructionsText* fields in src/config.m.']);
+end
+
+% Make an array of response instructions to index from
+respInst = {respInst1, respInst2};
+
+% Loop through the place holder positions and replace them
+for i = 1:numel(idx)
+    % Convert the cell content to a string
+    respStr = char(respInst{i});
+
+    % Replace the placeholder with the corresponding value from respStr
+    instructionParagraph = [instructionParagraph(1:idx(i)-1), respStr, instructionParagraph(idx(i)+2:end)];
+
+    % Update the next index in case the paragraph changed size
+    idx(i+1:end) = strfind(instructionParagraph, '()');
+end
+
+%% Draw instructions
+% Draw the instruction paragraph in black, centered on the screen
+DrawFormattedText(win, instructionParagraph, 'center', 'center', in.black);
 
 % Add debug overlay if enabled
 if isfield(dbg, 'overlay') && dbg.overlay

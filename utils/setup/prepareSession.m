@@ -46,7 +46,7 @@ in.runNum = runNum;
 in.timestamp = char(datetime('now', 'Format', 'yyyy-MM-dd_HHmmss'));
 
 % Construct subject-specific output directory path
-subID = ['sub-' zeroFill(num2str(subNum), 2)];
+subID = sprintf('sub-%02d', subNum);
 in.resDir = fullfile(pwd, 'data', subID);
 
 % Create directory if not in debug mode

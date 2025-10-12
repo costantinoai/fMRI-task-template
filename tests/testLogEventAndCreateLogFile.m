@@ -6,7 +6,9 @@ classdef testLogEventAndCreateLogFile < matlab.unittest.TestCase
             in.resDir = tempname;
             mkdir(in.resDir);
             in.subNum = 1; in.runNum = 1;
-            logFile = createLogFile(params, in);
+            debugMode = false;
+            dbg.writeLogs = true;
+            logFile = createLogFile(params, in, debugMode, dbg);
             testCase.onFailure(@() fclose(logFile));
             logEvent(logFile, 'EVENT_TYPE','EVENT_NAME','DATETIME','EXP','ACT','DELTA','ID');
             fclose(logFile);

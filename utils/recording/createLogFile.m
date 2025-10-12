@@ -1,49 +1,68 @@
-function logFile = createLogFile(params, in)
-% CREATELOGFILE - Create a log file for recording experiment data.
+function logFile = createLogFile(params, in, debugMode, dbg)
+% CREATELOGFILE Create log file and write header row.
 %
-%   logFile = CREATELOGFILE(params, in) creates a log file to record 
-%   all experiment data, trial by trial. The log file will be named and
-%   saved based on values from the user input (in) and global parameters
-%   (params).
-%   The output log file is taken as input by the logOutput function,
-%   which will write logging output in it, line by line, if not in 
-%   debug mode.
+%   Centralizes logging initialization: determines output destination
+%   (file vs console), creates log file with proper naming, and writes
+%   the TSV header row.
 %
-%   Input arguments:
-%   - params: A structure containing parameters for the experiment,
-%       including:
-%     * taskName: the short name given to the task by the experimenter.
-%   - in: A structure containing input information, including:
-%     * subNum: Subject number for the experiment.
-%     * runNum: Run number for the experiment.
-%     * resDir: Subject-specific directory path where the log file 
-%       will be saved.
+% Inputs:
+%   params    - Experiment parameters (taskName)
+%   in        - Session info (subNum, runNum, timestamp, resDir)
+%   debugMode - If true and dbg.writeLogs=false, log to console (stdout=1)
+%   dbg       - Debug options struct (writeLogs field)
 %
-%   Output argument:
-%   - logFile: File identifier for the created log file.
-% 
-%   Author
-%   Tim Maniquet [15/3/24]
+% Outputs:
+%   logFile - File handle (1 for console, integer FID otherwise)
+%
+% Errors:
+%   File:CannotCreate - Cannot create log file in output directory
+%
+% Example:
+%   logFile = createLogFile(params, in, debugMode, dbg);
+%   logEvent(logFile, 'START', '-', dateTimeStr, '-', 0, '-', '-');
+%
+% Author: fMRI Task Template Team
+% Last updated: 2025
 
-% Check if the required fields are present in the params structure
-requiredFields = {'taskName'};
-missingFields = setdiff(requiredFields, fieldnames(params));
-if ~isempty(missingFields)
-    error('createLogFile:paramsMissing', ['Required field(s) %s missing in the params structure. ', ...
-        'Set ''taskName'' in src/config.m.'], strjoin(missingFields, ', '));
+% Determine logging destination based on debug mode and config
+if debugMode && isfield(dbg, 'writeLogs') && ~dbg.writeLogs
+    % Log to console (stdout)
+    logFile = 1;
+else
+    % Create log file in output directory
+    try
+        % Check if the required fields are present in the params structure
+        requiredFields = {'taskName'};
+        missingFields = setdiff(requiredFields, fieldnames(params));
+        if ~isempty(missingFields)
+            error('createLogFile:paramsMissing', ['Required field(s) %s missing in the params structure. ', ...
+                'Set ''taskName'' in src/config.m.'], strjoin(missingFields, ', '));
+        end
+
+        % Create a run info tag with structure 'sub-xx_run-xx'
+        runInfo = sprintf('sub-%02d_run-%02d', in.subNum, in.runNum);
+
+        % Construct a unique log file name using the time stamp, run info and task name
+        % Keep this naming stable, as downstream tools depend on it.
+        logFileName = strcat(dateTimeStr, '_', runInfo, '_task-', params.taskName, '_log.tsv');
+
+        % Create a path for the log file in the results folder
+        logFilePathName = fullfile(in.resDir, logFileName);
+
+        % Initiate the log file by creating it in write mode
+        logFile = fopen(logFilePathName, 'a');
+
+    catch ME
+        error('File:CannotCreate', ...
+            ['Cannot create log file in %s.\n', ...
+             'Ensure output directory exists and is writable.\n', ...
+             'Original error: %s'], ...
+            in.resDir, ME.message);
+    end
 end
 
-% Create a run info tag with structure 'sub-xx_run-xx'
-runInfo = ['sub-' zeroFill(in.subNum, 2) '_run-' zeroFill(num2str(in.runNum), 2)];
-
-% Construct a unique log file name using the time stamp, run info and task name
-% Keep this naming stable, as downstream tools depend on it.
-logFileName = strcat(dateTimeStr, '_', runInfo, '_task-', params.taskName, '_log.tsv');
-
-% Create a path for the log file in the results folder
-logFilePathName = fullfile(in.resDir, logFileName);
-
-% Initiate the log file by creating it in write mode
-logFile = fopen(logFilePathName, 'a');
+% Write TSV header row
+logEvent(logFile, 'EVENT_TYPE', 'EVENT_NAME', 'DATETIME', 'EXP_ONSET', ...
+    'ACTUAL_ONSET', 'DELTA', 'EVENT_ID');
 
 end

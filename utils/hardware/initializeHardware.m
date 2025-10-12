@@ -33,7 +33,8 @@ function [win, winRect, screen, in, inputDevs] = initializeHardware(params, in, 
 
 %% Initialize PTB
 try
-    initializePTB();
+    Screen('CloseAll');
+    KbName('UnifyKeyNames');
 catch ME
     error('Hardware:PTBFailed', ['PTB initialization failed: %s. ', ...
         'Make sure Psychtoolbox is installed and on the MATLAB path.'], ME.message);
@@ -85,13 +86,13 @@ end
 in.scriptStart = VBLTimestamp;
 
 %% Configure screen colors
-[white, gray, black] = configScreenCol(screen);
-in.white = white;
-in.gray = gray;
-in.black = black;
+% Get CLUT indices for black/white/gray
+in.white = WhiteIndex(screen);
+in.black = BlackIndex(screen);
+in.gray = round(in.white / 2);
 
 % Fill screen with gray background
-Screen(win, 'FillRect', gray);
+Screen(win, 'FillRect', in.gray);
 
 %% Compute pixels per degree (PPD)
 if isfield(params, 'useScreenGeometry') && params.useScreenGeometry
