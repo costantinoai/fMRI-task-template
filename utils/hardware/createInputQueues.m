@@ -1,17 +1,36 @@
-function inputDevs = createInputQueues(triggerDeviceID, responseDeviceID)
+function inputDevs = createInputQueues(params)
 %CREATEINPUTQUEUES Create and start input queues for trigger and responses.
-%   inputDevs = createInputQueues(trigID, respID)
-%   If IDs are empty ([]), uses the default device for that queue.
+%   inputDevs = createInputQueues(params)
+%   Extracts device IDs from params.deviceIDs (if present), otherwise uses defaults.
 %
 %   This function centralizes queue setup logic. It supports a single
 %   device used for both trigger and responses (created once), or two
 %   separate devices (created separately).
+%
+% Inputs:
+%   params - Must include params.deviceIDs.trigger and params.deviceIDs.response
+%            (or pass [] to use defaults)
+%
+% Outputs:
+%   inputDevs - Struct with trigger and response device arrays
+%
+% Example:
+%   inputDevs = createInputQueues(params);
+
+% Extract device IDs from params (if provided)
+if nargin < 1 || ~isstruct(params) || ~isfield(params, 'deviceIDs') || ~isstruct(params.deviceIDs)
+    triggerDeviceID = [];
+    responseDeviceID = [];
+else
+    triggerDeviceID = params.deviceIDs.trigger;
+    responseDeviceID = params.deviceIDs.response;
+end
 
 % Default to empty -> default device
-if nargin < 1 || isempty(triggerDeviceID)
+if isempty(triggerDeviceID)
     triggerDeviceID = [];
 end
-if nargin < 2 || isempty(responseDeviceID)
+if isempty(responseDeviceID)
     responseDeviceID = [];
 end
 

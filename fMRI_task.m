@@ -39,14 +39,10 @@ cleanObj = onCleanup(@()sca);  % Ensure PTB window closes on script exit
 % === EXPERIMENT MODES (change these for your study) ===
 debugMode = true;   % true = windowed mode, PC inputs, pretty console
 fmriMode = false;   % true = fullscreen, MRI inputs, scanner geometry
-% (Device IDs configured in src/config.m)
 
 %% INITIALIZE SESSION
 % Load config, setup paths, validate params (all boilerplate consolidated)
 [params, paths, dbg] = initializeSession(debugMode, fmriMode);
-
-% Event name constants (read from config for easy customization)
-EVN = params.eventNames;  % Struct with all event names
 
 %% GET SUBJECT INFO
 % Prompt for subject/run numbers (or use defaults in debug mode)
@@ -68,23 +64,16 @@ logFile = createLogFile(params, in, debugMode, dbg);
 % Embed the rest of the script in a try-catch structure to log errors
 try
     %% HARDWARE INITIALIZATION
-    % Four explicit steps for clarity (no hidden workflow)
+    % Three explicit steps for clarity (no hidden workflow)
 
     % 1. Initialize Psychtoolbox (close screens, unify key names)
     initPTB();
 
     % 2. Create input queues for trigger and response devices
-    if isfield(params, 'deviceIDs') && isstruct(params.deviceIDs)
-        inputDevs = createInputQueues(params.deviceIDs.trigger, params.deviceIDs.response);
-    else
-        inputDevs = createInputQueues([], []);
-    end
+    inputDevs = createInputQueues(params);
 
-    % 3. Open PTB window and configure colors
-    [win, winRect, screen, in] = openScreen(debugMode, dbg, in);
-
-    % 4. Compute pixels per degree (PPD) for visual angle calculations
-    [in, params] = computePPD(params, in, fmriMode, screen);
+    % 3. Open PTB window, configure colors, and compute PPD
+    [win, winRect, screen, in, params] = openScreen(params, in, fmriMode, debugMode, dbg);
 
     % Print device info in debug mode
     if debugMode
@@ -137,7 +126,7 @@ try
 
     % Flip and log
     VBL = Screen('Flip', win);
-    logEvent(logFile, 'FLIP', EVN.preFix, dateTimeStr, '-', VBL - in.scriptStart, '-', '-');
+    logEvent(logFile, 'FLIP', params.eventNames.preFix, dateTimeStr, '-', VBL - in.scriptStart, '-', '-');
 
     % Record run start time (for ideal onset calculations)
     runStart = VBL;
@@ -183,7 +172,7 @@ try
         % Flip to screen and log event
         VBL = Screen('Flip', win);
         actualStimOnset = VBL - in.scriptStart;
-        logEvent(logFile, 'FLIP', EVN.stimulus, dateTimeStr, runTrials(i).idealStimOnset, actualStimOnset, ...
+        logEvent(logFile, 'FLIP', params.eventNames.stimulus, dateTimeStr, runTrials(i).idealStimOnset, actualStimOnset, ...
             actualStimOnset - runTrials(i).idealStimOnset, runTrials(i).stimuli);
 
         % Store actual onset for drift compensation
@@ -235,7 +224,7 @@ try
 
         % Flip fixation to screen and log
         VBL = Screen('Flip', win);
-        logEvent(logFile, 'FLIP', EVN.fixation, dateTimeStr, '-', VBL - in.scriptStart, '-', '-');
+        logEvent(logFile, 'FLIP', params.eventNames.fixation, dateTimeStr, '-', VBL - in.scriptStart, '-', '-');
 
         % Wait for fixation duration and log any additional key presses
         conditionFunc = @(x) (GetSecs - VBL) <= fixDurAdj;
@@ -265,7 +254,7 @@ try
 
     % Flip and log
     PostFixFlip = Screen('Flip', win);
-    logEvent(logFile, 'FLIP', EVN.postFix, dateTimeStr, '-', PostFixFlip - in.scriptStart, '-', '-');
+    logEvent(logFile, 'FLIP', params.eventNames.postFix, dateTimeStr, '-', PostFixFlip - in.scriptStart, '-', '-');
 
     % Record any key presses during this final fixation period
     conditionFunc = @(x) (GetSecs - PostFixFlip) <= (params.prePost * dbg.slowMoFactor);

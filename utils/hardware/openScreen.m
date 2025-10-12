@@ -1,25 +1,30 @@
-function [win, winRect, screen, in] = openScreen(debugMode, dbg, in)
-% OPENSCREEN Open PTB window and configure screen colors.
+function [win, winRect, screen, in, params] = openScreen(params, in, fmriMode, debugMode, dbg)
+% OPENSCREEN Open PTB window, configure colors, and compute PPD.
 %
 %   Opens PTB graphics window (fullscreen or windowed based on mode),
-%   gets color indices, fills with gray, and stores timing reference.
+%   gets color indices, fills with gray, computes pixels per degree,
+%   and stores timing reference.
 %
 % Inputs:
+%   params    - Experiment parameters (useScreenGeometry, scrDist, scrWidth, etc.)
+%   in        - Session info (will be updated with scriptStart, colors, PPD)
+%   fmriMode  - If true, use MRI screen geometry
 %   debugMode - If true, open windowed mode
 %   dbg       - Debug options (windowScale, skipSyncTests, releaseSkipSyncTests)
-%   in        - Session info (will be updated with scriptStart, colors)
 %
 % Outputs:
 %   win     - PTB window pointer
 %   winRect - Screen rectangle [x1 y1 x2 y2]
 %   screen  - Screen number
-%   in      - Updated with scriptStart, white, gray, black
+%   in      - Updated with scriptStart, white, gray, black, PPD
+%   params  - Updated with PPD (for utilities that only receive params)
 %
 % Errors:
-%   Hardware:ScreenFailed - Screen setup failed
+%   Hardware:ScreenFailed     - Screen setup failed
+%   Hardware:MissingGeometry  - Required geometry fields missing
 %
 % Example:
-%   [win, winRect, screen, in] = openScreen(true, dbg, in);
+%   [win, winRect, screen, in, params] = openScreen(params, in, false, true, dbg);
 %
 % Author: fMRI Task Template Team
 % Last updated: 2025
@@ -57,5 +62,8 @@ in.gray = round(in.white / 2);
 
 % Fill screen with gray background
 Screen(win, 'FillRect', in.gray);
+
+%% Compute pixels per degree (PPD) for visual angle calculations
+[in, params] = computePPD(params, in, fmriMode, screen);
 
 end
