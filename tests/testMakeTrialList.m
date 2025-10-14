@@ -26,7 +26,7 @@ classdef testMakeTrialList < matlab.unittest.TestCase
             params = struct();
             params.stimListFile = 'src/list_of_stimuli.tsv';
             params.numRepetitions = 1;
-            params.numRuns = 3; % not divisible by example list length
+            params.numRuns = 5; % 24 stimuli not divisible by 5
             params.prePost = 1; params.stimDur = 0.5; params.fixDur = 0.5; params.trialDur = 1;
             params.respKey1Code = 49; params.respKey2Code = 50; params.respInst1='L'; params.respInst2='R';
             in.subNum = 1;

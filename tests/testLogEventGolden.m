@@ -10,7 +10,6 @@ classdef testLogEventGolden < matlab.unittest.TestCase
 
             tmpFile = tempname;
             fid = fopen(tmpFile, 'w');
-            testCase.onFailure(@() fclose(fid));
 
             % Write header (first row convention)
             logEvent(fid, 'EVENT_TYPE', 'EVENT_NAME', 'DATETIME', 'EXP_ONSET', 'ACTUAL_ONSET', 'DELTA', 'EVENT_ID');
@@ -20,7 +19,8 @@ classdef testLogEventGolden < matlab.unittest.TestCase
             content = fileread(tmpFile);
             delete(tmpFile);
 
-            expectedHeader = 'EVENT_TYPE\tEVENT_NAME\tDATETIME\tEXP_ONSET\tACTUAL_ONSET\tDELTA\tEVENT_ID';
+            % Expected header with actual tab characters (sprintf('\t'))
+            expectedHeader = sprintf('EVENT_TYPE\tEVENT_NAME\tDATETIME\tEXP_ONSET\tACTUAL_ONSET\tDELTA\tEVENT_ID');
             actualHeader = strtrim(content);
 
             testCase.verifyEqual(actualHeader, expectedHeader, ...

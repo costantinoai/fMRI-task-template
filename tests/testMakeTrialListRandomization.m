@@ -36,12 +36,12 @@ classdef testMakeTrialListRandomization < matlab.unittest.TestCase
 
             tl = makeTrialList(params, in);
 
-            % Order should be preserved
+            % Order should be preserved (convert to char for comparison)
             stims = {tl.stimuli};
-            testCase.verifyEqual(stims{1}, 'A');
-            testCase.verifyEqual(stims{2}, 'B');
-            testCase.verifyEqual(stims{3}, 'C');
-            testCase.verifyEqual(stims{4}, 'D');
+            testCase.verifyEqual(char(stims{1}), 'A');
+            testCase.verifyEqual(char(stims{2}), 'B');
+            testCase.verifyEqual(char(stims{3}), 'C');
+            testCase.verifyEqual(char(stims{4}), 'D');
 
             rmdir(tmpDir, 's');
         end

@@ -5,6 +5,12 @@ classdef testPrepareEnvironment < matlab.unittest.TestCase
     methods(Test)
         function testHappyPath(testCase)
             % Test normal execution with all folders present
+            % Find repo root (contains fMRI_task.m)
+            testDir = fileparts(mfilename('fullpath'));
+            repoRoot = fileparts(testDir);
+            oldDir = cd(repoRoot);
+            testCase.addTeardown(@() cd(oldDir));
+
             addpath(genpath('./utils'));
 
             paths = prepareEnvironment();
@@ -20,14 +26,23 @@ classdef testPrepareEnvironment < matlab.unittest.TestCase
             testCase.verifyNotEmpty(paths.src);
             testCase.verifyNotEmpty(paths.root);
 
-            % Verify paths are absolute
-            testCase.verifyTrue(isabsolute(paths.utils));
-            testCase.verifyTrue(isabsolute(paths.src));
-            testCase.verifyTrue(isabsolute(paths.root));
+            % Verify paths are absolute (check for leading / or ~)
+            testCase.verifyTrue(paths.utils(1) == '/' || paths.utils(1) == '~', ...
+                'utils path should be absolute');
+            testCase.verifyTrue(paths.src(1) == '/' || paths.src(1) == '~', ...
+                'src path should be absolute');
+            testCase.verifyTrue(paths.root(1) == '/' || paths.root(1) == '~', ...
+                'root path should be absolute');
         end
 
         function testUtilsOnPath(testCase)
             % Verify utils/ subdirectories added to path
+            % Find repo root
+            testDir = fileparts(mfilename('fullpath'));
+            repoRoot = fileparts(testDir);
+            oldDir = cd(repoRoot);
+            testCase.addTeardown(@() cd(oldDir));
+
             addpath(genpath('./utils'));
 
             paths = prepareEnvironment();

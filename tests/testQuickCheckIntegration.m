@@ -3,6 +3,16 @@ classdef testQuickCheckIntegration < matlab.unittest.TestCase
     %   Validates the complete config -> params -> trial list -> image subset flow
     %   without opening PTB windows. Tests the same logic as scripts/quick_check.m
 
+    methods(TestMethodSetup)
+        function changeToRepoRoot(testCase)
+            % Change to repo root before each test
+            testDir = fileparts(mfilename('fullpath'));
+            repoRoot = fileparts(testDir);
+            oldDir = cd(repoRoot);
+            testCase.addTeardown(@() cd(oldDir));
+        end
+    end
+
     methods(Test)
         function testCompleteWorkflow(testCase)
             % Full integration: config load, validation, trial list, image subset
@@ -25,9 +35,8 @@ classdef testQuickCheckIntegration < matlab.unittest.TestCase
             fmriMode = false;
             params = TaskConfig.load(cfgPath, fmriMode);
 
-            % Validate params
-            testCase.verifyNoException(@() validateParams(params, fmriMode), ...
-                'Params validation should pass');
+            % Validate params (should not error)
+            validateParams(params, fmriMode);
 
             % Create minimal input struct
             in = struct();
@@ -53,7 +62,7 @@ classdef testQuickCheckIntegration < matlab.unittest.TestCase
 
                 % Verify images loaded
                 testCase.verifyNotEmpty(imSubset, 'Image subset should not be empty');
-                testCase.verifyEqual(numel(imSubset), numel(subsetIdx), ...
+                testCase.verifyEqual(numel(imSubset.image), numel(subsetIdx), ...
                     'Should load exactly the requested number of images');
             end
         end
@@ -126,8 +135,8 @@ classdef testQuickCheckIntegration < matlab.unittest.TestCase
                 subsetIdx = nonFix(1);
                 imSubset = loadImages(trialList(subsetIdx), params);
 
-                testCase.verifyEqual(numel(imSubset), 1, 'Should load 1 image');
-                testCase.verifyNotEmpty(imSubset(1).im, 'Image data should not be empty');
+                testCase.verifyEqual(numel(imSubset.image), 1, 'Should load 1 image');
+                testCase.verifyNotEmpty(imSubset.image(1).im, 'Image data should not be empty');
             end
         end
 

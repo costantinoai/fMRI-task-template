@@ -1,76 +1,112 @@
-# fMRI task template
+# fMRI Task Template
 
-This is a template script for running a task in the fMRI scanner. It is designed to be modular, lightweight and easy to adapt to your needs. Your main tool is `fMRI_task.m`, which is designed to play one run of experimental task at a time.
+A **beginner-friendly** MATLAB/Psychtoolbox template for visual fMRI experiments. Build reliable scanner tasks without becoming a PTB expert.
 
-The structure & most of the ideas for this repo come from work by [@costantinoai](https://github.com/costantinoai) and [@laura](https://www.hoplab.be/people/#LauraVH). It was adapted by [@TimManiquet](https://github.com/TimManiquet).
+## What This Template Does
+
+- ✅ **Low cognitive load**: Main script uses clear, workflow-oriented function calls—no PTB boilerplate
+- ✅ **Hides complexity**: Screen setup, input handling, and logging wrapped in simple functions
+- ✅ **Reliable timing**: Automatic drift compensation keeps your task on schedule
+- ✅ **Complete logging**: Every flip and keypress timestamped in analysis-ready TSV files
+- ✅ **Easy customization**: Change timing, stimuli, and trial structure without touching utilities
+- ✅ **Debug-friendly**: Windowed mode with optional overlays for development
+
+**Best for**: Block or event-related designs showing visual stimuli with 1-2 button responses.
+
+**Design philosophy**: Each operation in the main script is one clear function call. Trial loop is explicit and easy to modify.
+
+The structure & ideas come from work by [@costantinoai](https://github.com/costantinoai) and [@laura](https://www.hoplab.be/people/#LauraVH). Template by [@TimManiquet](https://github.com/TimManiquet).
 
 
-**Repository structure**
+## Repository Structure
+
 ```
 .
-├── data
-│   └── sub-01
-│       └── ...
-├── fMRI_task.m
-├── README.md
-├── scripts
-│   └── quick_check.m
-├── src
-│   ├── list_of_stimuli.tsv
-│   ├── config.m
-│   ├── readme_files
-│   └── stimuli
-│       └── your images here ...
-└── utils
-    ├── setup/          # Experiment configuration & trial design
-    │   ├── TaskConfig.m
-    │   ├── validateParams.m
-    │   ├── validateInstructionPlaceholders.m
-    │   ├── makeTrialList.m
-    │   ├── validateTrialList.m
-    │   ├── determineButtonMapping.m
-    │   └── loadImages.m
-    ├── display/        # Screen rendering & visual presentation
-    │   ├── displayInstructions.m
-    │   ├── displayTrial.m
-    │   ├── displayFixation.m
-    │   ├── flipAndLog.m
-    │   └── resizeStim.m
-    ├── recording/      # Data logging & response tracking
-    │   ├── createLogFile.m
-    │   ├── logEvent.m
-    │   ├── logKeyPressDual.m
-    │   ├── shouldSuppress.m
-    │   └── saveAndClose.m
-    ├── hardware/       # PTB initialization & device management
-    │   ├── initializePTB.m
-    │   ├── setupScreen.m
-    │   ├── configScreenCol.m
-    │   ├── createInputQueues.m
-    │   └── listDevices.m
-    └── lib/            # Generic helper utilities
-        ├── dateTimeStr.m
-        ├── zeroFill.m
-        ├── convertVisualUnits.m
-        └── adjustFixationDuration.m
+├── fMRI_task.m              # ⭐ Main script (231 lines, easy to read)
+├── src/
+│   ├── config.m             # ⚙️ Configure your experiment here
+│   ├── list_of_stimuli.tsv # 📋 Your trial list
+│   └── stimuli/             # 🖼️ Your image files
+├── scripts/
+│   ├── quick_check.m        # ✅ Validate config before running
+│   ├── dev_smoke.m          # 🚀 Fast 2-trial test
+│   ├── list_devices.m       # 🔌 Find device IDs
+│   └── pretty_log.m         # 📊 Pretty-print log files
+├── utils/                   # 🛠️ You rarely need to edit these
+│   ├── setup/               # Session initialization
+│   ├── hardware/            # PTB and device setup
+│   ├── display/             # Visual rendering
+│   ├── recording/           # Logging and input
+│   └── lib/                 # Helper functions
+├── tests/                   # 🧪 Unit and integration tests
+├── data/                    # 💾 Output directory (created automatically)
+│   └── sub-XX/
+│       ├── *_log.tsv        # Event logs (FLIP, RESP, timing)
+│       └── *.mat            # Trial data + images
+└── docs/
+    ├── README.md            # 👈 You are here
+    ├── API.md               # 📚 Function reference
+    ├── CLAUDE.md            # 🤖 For AI assistants
+    └── TODO.md              # 📋 Project roadmap
 ```
 
+**What you'll edit most**:
+1. `src/config.m` - Timing, key codes, instructions
+2. `src/list_of_stimuli.tsv` - Trial stimuli and metadata
+3. `fMRI_task.m` - Only if you need custom trial logic (feedback, ratings, etc.)
 
-### Requirements
 
-Make sure the following exist in your root directory:
+## Getting Started (5 Minutes)
 
- - A `utils` folder containing utility functions.
- - A `src` folder containing all your stimuli in `src/stimuli`.
-- A `config.m` file in the `src` directory, returning a struct of experimental parameters.
-  - A `list_of_stimuli.tsv` file in the `src` directory, containing a list of your trial stimuli & other relevant variables.
+### Prerequisites
+- MATLAB R2020b or later
+- Psychtoolbox 3 installed ([installation guide](http://psychtoolbox.org/download))
+- A computer with a display (external monitors work fine for testing)
 
-Before starting your experiment, make sure you set the flags `debugMode` and `fmriMode`. These will determine a number of things:
+### Quick Start
 
-- `debugMode` should be turned on if you are still developing. It will make your experiment run in a window instead of full screen, and will prevent data from being saved. Switching it off will make the cursor disappear for the time of the experiment, have it run in full screen, and save all result and log all the data.
-- `fmriMode` will have the fMRI screen properties, response & trigger buttons, and response instruction values used. Switching it off will turn these parameters to their PC values.
+1. **Clone and open**
+   ```matlab
+   cd /path/to/fMRI-task-template
+   % MATLAB should be in the repo root directory
+   ```
 
-Input devices and simultaneous events: configure `deviceIDs.trigger` and `deviceIDs.response` in `src/config.m` to bind queues to specific devices. The template uses dual queues and logs both trigger and response events even when they occur at the same time.
+2. **Check everything works**
+   ```matlab
+   scripts/quick_check  % Validates config without opening PTB windows
+   ```
+
+3. **Run a test**
+   - Open `fMRI_task.m`
+   - Make sure these lines say:
+     ```matlab
+     debugMode = true;   % Windowed, no save
+     fmriMode = false;   % Use keyboard instead of button box
+     ```
+   - Run `fMRI_task` in MATLAB
+   - Press `t` when it says "Experiment loading..." (simulates scanner trigger)
+   - Press `f` or `j` to respond to stimuli
+
+4. **Customize for your study**
+   - Edit `src/config.m` to change timing, instructions, and key codes
+   - Replace images in `src/stimuli/` with your own
+   - Edit `src/list_of_stimuli.tsv` to list your stimuli
+
+### Two Important Flags
+
+Set these at the top of `fMRI_task.m` before running:
+
+**`debugMode`** (line 45)
+- `true` = Windowed mode, no saving, console output (for development)
+- `false` = Fullscreen, saves data, hides cursor (for real experiments)
+
+**`fmriMode`** (line 50)
+- `true` = Use scanner trigger codes and MRI screen geometry
+- `false` = Use keyboard codes and PC screen geometry
+
+**Typical workflow**:
+- Development: `debugMode=true, fmriMode=false`
+- Scanner: `debugMode=false, fmriMode=true`
 
 
 ### Configuration (MATLAB)
@@ -323,14 +359,17 @@ params.prePost = 10;   % 10s pre/post fixation blocks
 
 **When to use**: Need visual feedback, multi-button responses, or response-contingent displays.
 
-**Where to edit**: Trial loop section in `fMRI_task.m` (lines ~227-324). Key customization points:
-- **Line ~235**: Stimulus display (`displayTrial` call) - change what's shown
-- **Line ~261-279**: Response collection - change input method (rating scale, multi-button)
-- **After line ~311**: Add feedback display based on response
+**Where to edit**: Trial loop section in `fMRI_task.m` (lines ~144-190). Key customization points:
+- **Line ~150**: Stimulus display (`showTrialStimulus` call) - change trial presentation
+- **Line ~158-163**: Response collection - change input method (rating scale, multi-button)
+- **Line ~166**: Fixation display (`showFixationPeriod` call) - change inter-trial behavior
+- **After response collection**: Add feedback display based on response
 
-**Example**: Add visual feedback
+**Note**: High-level wrapper functions (`showTrialStimulus`, `showFixationPeriod`) reduce boilerplate. Override them or call lower-level functions (`displayTrial`, `displayFixation`) directly for custom behavior.
+
+**Example 1**: Add visual feedback
 ```matlab
-% After line ~311 in fMRI_task.m (after response is stored):
+% After line ~163 in fMRI_task.m (after response is stored):
 if isfield(runTrials(i), 'correctAnswer')
     isCorrect = (runTrials(i).response == runTrials(i).correctAnswer);
     Screen('FillRect', win, in.gray);
@@ -345,13 +384,27 @@ if isfield(runTrials(i), 'correctAnswer')
 end
 ```
 
+**Example 2**: Override stimulus display wrapper
+```matlab
+% Replace showTrialStimulus call (line ~150) with custom display:
+Screen('FillRect', win, in.gray);
+currentImage = getTrialImage(runImMat, i);
+% ... custom drawing code here ...
+VBL = Screen('Flip', win);
+actualStimOnset = VBL - in.scriptStart;
+logEvent(logFile, 'FLIP', params.eventNames.stimulus, dateTimeStr, ...
+    runTrials(i).idealStimOnset, actualStimOnset, ...
+    actualStimOnset - runTrials(i).idealStimOnset, runTrials(i).stimuli);
+runTrials(i).stimOnset = actualStimOnset;
+```
+
 #### Level 3: Custom Trial List Generation
 
 **What**: Create custom trial list builder for complex designs (blocking, counterbalancing, adaptive).
 
 **When to use**: Need blocked designs, custom randomization, or trial-by-trial parameter control.
 
-**How**: Create `src/makeTrialListCustom.m` and call it instead of `makeTrialList` in `fMRI_task.m` line ~131.
+**How**: Create `src/makeTrialListCustom.m` and call it instead of `makeTrialList` in `fMRI_task.m` line ~60.
 
 **Example**: Blocked design with 3 conditions
 ```matlab
@@ -370,7 +423,7 @@ end
 
 **When to use**: Need non-standard displays (movies, real-time rendering) or specialized input devices.
 
-**How**: Create custom display functions in `src/` and call from orchestrator functions.
+**How**: Override high-level wrappers (`showTrialStimulus`, `showFixationPeriod`) or create custom display functions in `src/` and call them.
 
 **Resources**:
 - **Full examples**: See `examples/CUSTOMIZATION_EXAMPLES.md` for 6 complete examples

@@ -1,4 +1,14 @@
 classdef testValidateTrialList < matlab.unittest.TestCase
+    methods(TestMethodSetup)
+        function changeToRepoRoot(testCase)
+            % Change to repo root before each test
+            testDir = fileparts(mfilename('fullpath'));
+            repoRoot = fileparts(testDir);
+            oldDir = cd(repoRoot);
+            testCase.addTeardown(@() cd(oldDir));
+        end
+    end
+
     methods(Test)
         function testMissingStimFile(testCase)
             addpath(genpath('./utils'));

@@ -75,17 +75,32 @@ end
 % Duplicate the list of stimuli based on the declared number of repetitions
 stimList = repmat(stimListTable, params.numRepetitions, 1);
 
-% If the total number of trials isn't divisible by the number of runs, 
-% raise an error
-if mod(height(stimList), params.numRuns) ~= 0
-    error('makeTrialList:InvalidRuns', ['Your list of %d trials cannot be divided into %d runs of equal length. ', ...
-        'Adjust either numRuns, numRepetitions, or the stimulus list length to ensure equal runs.'], ...
-        height(stimList), params.numRuns);
+% Check if we have an external run column
+hasExternalRun = ismember('run', stimList.Properties.VariableNames);
+
+% If no external run column, validate divisibility and add run numbers
+if ~hasExternalRun
+    % If the total number of trials isn't divisible by the number of runs, raise error
+    if mod(height(stimList), params.numRuns) ~= 0
+        error('makeTrialList:InvalidRuns', ['Your list of %d trials cannot be divided into %d runs of equal length. ', ...
+            'Adjust either numRuns, numRepetitions, or the stimulus list length to ensure equal runs.'], ...
+            height(stimList), params.numRuns);
+    end
+
+    % Calculate how many trials we have per run
+    trialsPerRun = floor(height(stimList) / params.numRuns);
+
+    % Make a list of run numbers corresponding to the trials
+    runList = repelem(1:params.numRuns, trialsPerRun)';
+    % Convert the runList to a table
+    runTable = array2table(runList, 'VariableNames', {'run'});
+    % Concatenate the runTable with the stimList table
+    stimList = [stimList, runTable];
+else
+    % External run column exists - validate it makes sense with params.numRuns
+    % Calculate trials per run for onset calculations
+    trialsPerRun = floor(height(stimList) / params.numRuns);
 end
-
-
-% Calculate how many trials we have per run
-trialsPerRun = floor(height(stimList) / params.numRuns);
 
 % Randomize trials if required, per run or across the task
 if isfield(params, 'stimRandomization')
@@ -107,18 +122,8 @@ if isfield(params, 'stimRandomization')
     end
 end
 
-% If not present yet, add the run number information to the list
-if ismember('run', stimList.Properties.VariableNames)
-    % Extract the existing list of run numbers
-    runList = stimList.run;
-elseif ~ismember('run', stimList.Properties.VariableNames)
-    % Make a list of run numbers corresponding to the trials
-    runList = repelem(1:params.numRuns, trialsPerRun)';
-    % Convert the runList to a table
-    runTable = array2table(runList, 'VariableNames', {'run'});
-    % Concatenate the runTable with the stimList table
-    stimList = [stimList, runTable];
-end
+% Extract run list AFTER randomization (so it matches shuffled order)
+runList = stimList.run;
 % Calculate the ideal stimulus onset times for one run
 stimOnsetRun= params.prePost:params.trialDur: ...
     (trialsPerRun*params.trialDur)+(params.prePost-params.trialDur);
@@ -132,19 +137,22 @@ end
 trialList = table2struct(stimList);
 
 % Precompute mapping per run to avoid repeated compute
-mapCache = cell(1, params.numRuns);
-for r = 1:params.numRuns
-    mapCache{r} = determineButtonMapping(params, in.subNum, r);
+% Use containers.Map to handle arbitrary run numbers (not just 1:N)
+uniqueRuns = unique(runList);
+mapCache = containers.Map('KeyType', 'double', 'ValueType', 'any');
+for r = uniqueRuns'
+    runNumDouble = double(r);  % Ensure numeric type
+    mapCache(runNumDouble) = determineButtonMapping(params, in.subNum, runNumDouble);
 end
 
 % Add relevant columns to the trial list structure
 for i = 1:numel(trialList)
     % Declare a trial number
     trialList(i).trialNb = i;
-    % Declare a run number
-    trialList(i).run = runList(i);
+    % Declare a run number (already in struct from table2struct, but ensure consistency)
+    trialList(i).run = double(runList(i));
     % Declare a button mapping based on subject and run number (from cache)
-    map = mapCache{trialList(i).run};
+    map = mapCache(trialList(i).run);
     trialList(i).butMap    = map.mapNumber;
     trialList(i).respKey1Code = map.respKey1Code;
     trialList(i).respKey2Code = map.respKey2Code;

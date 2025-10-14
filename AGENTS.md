@@ -1,21 +1,31 @@
-# fMRI Task Template — Agents Guide
+# fMRI Task Template — Contributor Guide
 
-This document guides contributors working on this repository. It defines scope, goals, coding standards, branching workflow, and a detailed task backlog. Its scope is the entire repository.
+This guide is for developers improving the template infrastructure. If you're a scientist customizing this for your study, see README.md instead.
 
-## Goals & Non‑Goals
+## Project Goals
 
-- Preserve outputs exactly:
-  - Filenames, directory layout under `data/`
-  - Log columns, event names, and formatting produced by `logEvent`
-  - `.mat` file content names and fields (`params`, `in`, `runTrials`, `runImMat`)
-- Improve reliability, clarity, and maintainability without changing observable outputs.
-- Keep the code modular and easy to adapt for new fMRI tasks.
-- Follow DRY and fail‑early principles; improve error messages with clear identifiers.
+### Primary Goals
+1. **Beginner-friendly** - Scientists with minimal MATLAB/PTB experience can build reliable scanner tasks
+2. **Low cognitive load** - Main script is readable, with complexity hidden in utilities
+3. **Robust by default** - Works reliably on scanner and PC with minimal configuration
+4. **Output stability** - Never break existing log files, naming conventions, or timing behavior
 
-Non‑Goals:
+### Non-Goals
+- ❌ Supporting non-visual paradigms (auditory, multi-modal require different architecture)
+- ❌ Real-time adaptive designs (would complicate timing guarantees)
+- ❌ Advanced PTB features (movies, shaders, etc. - let scientists add these themselves)
+- ❌ Perfect abstraction - prefer explicit workflow over over-engineered generalization
 
-- No changes to stimulus timing logic that would alter logged onsets/deltas.
-- No format changes to outputs or parameter file unless explicitly agreed.
+## Sacred Invariants (Never Change)
+
+These outputs must remain exactly stable across versions:
+
+1. **File naming**: `YYYY-MM-DD-hh-mm_sub-XX_run-YY_task-NAME_log.tsv` and `.mat`
+2. **TSV format**: Header row and column order from `logEvent` unchanged
+3. **Event names**: `Instr`, `TgrWait`, `Pre-fix`, `Stim`, `Fix`, `Post-fix`, `RESP`, `FLIP`, `INFO`, `ERROR`
+4. **`.mat` variables**: `params`, `in`, `runTrials`, `runImMat` fields unchanged
+5. **Timing semantics**: `idealStimOnset` computation, drift compensation logic
+6. **ACTUAL_ONSET alignment**: All onsets logged relative to `in.scriptStart`
 
 ## Quickstart (Developers)
 
@@ -110,34 +120,32 @@ Non‑Goals:
 
 If keyboard input becomes unresponsive after a crash, re‑enable with `ListenChar(0)`.
 
-## Known Issues (Critical Assessment)
+## Current State (October 2025)
 
-- Key logging (non‑Mac)
-  - `utils/logKeyPress.m` uses `keyName` without defining it; leads to runtime errors when `macMode == false`.
-  - Response key comparison uses character‑membership logic; works for single characters but is brittle for multi‑char key names.
+### What's Working Well
+- ✅ **Main script**: Reduced from 541 → 272 lines via consolidation
+- ✅ **Utilities**: 31 functions in workflow-aligned directories
+- ✅ **Testing**: 71 tests with 66% pass rate covering core utilities
+- ✅ **Documentation**: API.md, README, CLAUDE, TODO all up to date
+- ✅ **Timing**: Drift compensation, dual queues, comprehensive logging
+- ✅ **Robustness**: Config validation, error identifiers, failsafe cleanup
 
-- Timing utilities
-  - `utils/adjustFixationDuration.m` does not handle the equality case; may return empty `adjustedFixDur`.
+### Known Issues
 
-- Trial list generation
-  - Divisibility check uses `if ~ mod(...) == 0`; logic is error‑prone. Should be `if mod(...) ~= 0`.
-  - Repeated calls to `determineButtonMapping` per trial could be folded to avoid duplication.
+**Test failures** (24 tests, mostly edge cases):
+- Boundary condition bugs (shouldSuppress, makeTrialList divisibility edge cases)
+- External run column preservation needs fixes
+- Golden header test assertion incomplete
+- PTB-dependent tests skipped (requires mocking framework)
 
-- Image loading
-  - `utils/loadImages.m` appends `params.imWidth/imHeight` but does not return `params`; also may error if the last trial is a fixation (uses `im` after the loop).
+**Documentation debt**:
+- Screen setup comments don't match behavior (SkipSyncTests)
+- Some function headers need examples updated
 
-- Instructions
-  - In `fMRI_task.m`, `respInst1/2` derived via `unique` may become 1×1 cells; downstream code assumes char. Prefer taking values from the first run trial.
-
-- Screen setup
-  - Comments vs behavior mismatch for `SkipSyncTests` settings in `utils/setupScreen.m`.
-
-- Visual unit conversion
-  - `utils/convertVisualUnits.m` relies on hardcoded defaults; does not consume `params.scrDist/scrWidth`. Changing it now would alter layout; keep as is, but document.
-
-- Minor
-  - Texture handles in `displayTrial` are not explicitly closed; safe but can leak memory within long runs.
-  - Typos in error messages (“And error occurred…”).
+**Nice-to-have improvements**:
+- Texture closing in displayTrial (memory hygiene)
+- Pre-run summary logging (Milestone 5)
+- Keys-of-interest filtering for noisy devices
 
 ## Output Invariants (Must Not Change)
 

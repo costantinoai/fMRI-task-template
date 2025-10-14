@@ -12,6 +12,8 @@ classdef testValidateParamsNumeric < matlab.unittest.TestCase
             params.escapeKeyCode = 27;
             % Bad: string code instead of numeric
             params.respKeyPC1Code = 'f'; params.respKeyPC2Code = 106; params.triggerKeyPCCode = 116;
+            params.respKey1Code = 'f'; params.respKey2Code = 106; params.triggerKeyCode = 116; % Unified keys
+            params.buttons = [102, 106]; % Buttons array required
             fmriMode=false;
             testCase.verifyError(@() validateParams(params, fmriMode), 'Params:InvalidValue');
         end

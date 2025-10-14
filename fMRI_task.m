@@ -155,40 +155,11 @@ try
         runTrials(i).idealStimOnset = preRunTime + runTrials(i).idealStimOnset;
 
         %% STIMULUS PRESENTATION
-        Screen('FillRect', win, in.gray);  % Clear to gray background
-
-        % Get preloaded image for this trial
-        if ~isempty(runImMat) && i <= numel(runImMat)
-            currentImage = runImMat(i);
-        else
-            currentImage = [];  % Handles fixation trials
-        end
-        displayTrial(params, in, currentImage, runTrials(i), 1, win, winRect);
-
-        % Optional debug overlay (toggle with special key during run)
-        if debugMode && dbg.overlay
-            drawDebugOverlay(win, sprintf('Trial %d | %s', i, runTrials(i).stimuli), in);
-        end
-
-        % Flip stimulus to screen and record precise timing
-        VBL = Screen('Flip', win);
-        actualStimOnset = VBL - in.scriptStart;  % Onset relative to script start
-
-        % Log stimulus flip with timing deviation (delta)
-        % Delta = actual - ideal; positive means late, negative means early
-        logEvent(logFile, 'FLIP', params.eventNames.stimulus, dateTimeStr, runTrials(i).idealStimOnset, actualStimOnset, ...
-            actualStimOnset - runTrials(i).idealStimOnset, runTrials(i).stimuli);
-
+        % Get preloaded image and display stimulus
+        currentImage = getTrialImage(runImMat, i);
+        [VBL, actualStimOnset] = showTrialStimulus(win, winRect, params, in, currentImage, ...
+            runTrials(i), i, logFile, debugMode, dbg);
         runTrials(i).stimOnset = actualStimOnset;  % Store for drift compensation
-
-        % Optional: warn if timing drifted beyond threshold
-        if debugMode && dbg.warnOnDrift
-            drift = (actualStimOnset - runTrials(i).idealStimOnset) * 1000; % Convert to ms
-            if abs(drift) > dbg.driftWarnMs
-                logEvent(logFile, 'WARN', 'Drift', dateTimeStr, '-', '-', '-', ...
-                    sprintf('Trial %d drifted %.1f ms', i, drift));
-            end
-        end
 
         %% RESPONSE COLLECTION
         % Wait for stimulus duration (params.stimDur), collecting first valid response
@@ -204,28 +175,17 @@ try
 
         %% INTER-STIMULUS FIXATION
         % Show fixation between trials, with duration adjusted for timing drift
-        Screen('FillRect', win, in.gray);
-        displayFixation(win, winRect, params, in);
-
         % Calculate drift-compensated fixation duration
         % If previous stimulus was late, this fixation is shortened to stay on track
         % If previous stimulus was early, this fixation is lengthened
         fixDur = adjustFixationDuration(runTrials, i, params);
-
-        if debugMode && dbg.overlay
-            drawDebugOverlay(win, sprintf('Fixation (%.2fs)', fixDur * dbg.slowMoFactor), in);
-        end
-
-        VBL = Screen('Flip', win);
-        logEvent(logFile, 'FLIP', params.eventNames.fixation, dateTimeStr, '-', VBL - in.scriptStart, '-', '-');
-
-        % Wait for fixation duration, capturing late responses
-        [additionalKey, in, dbg] = waitAndCaptureInput(params, in, logFile, fixDur, inputDevs, debugMode, dbg);
+        [VBL, lateResponse, in, dbg] = showFixationPeriod(win, winRect, params, in, fixDur, ...
+            logFile, inputDevs, debugMode, dbg);
 
         % Accept late response if participant didn't respond during stimulus
         % This allows slower responders to still provide valid data
-        if isnan(runTrials(i).response) && ~isempty(additionalKey)
-            runTrials(i).response = additionalKey;
+        if isnan(runTrials(i).response) && ~isempty(lateResponse)
+            runTrials(i).response = lateResponse;
         end
     end
     
