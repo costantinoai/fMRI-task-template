@@ -149,9 +149,9 @@ params.scrWidthPC = 510;
 % params.respKeyMRI2 = 52; % this is the double version of '4')
 % params.triggerKeyMRI = 53; % this is the double version of '5')
 
-params.respKeyMRI1 = 3;
-params.respKeyMRI2 = 4;
-params.triggerKeyMRI = 5;
+params.respKeyMRI1 = '3#';
+params.respKeyMRI2 = '4$';
+params.triggerKeyMRI = '5%';
 
 % Give names to the response keys for instruction purposes
 % Make sure the instructions response keys match the order of the actual given response keys
