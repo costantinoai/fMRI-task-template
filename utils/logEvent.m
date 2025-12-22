@@ -32,31 +32,34 @@ function logEvent(logFile, eventType, eventName, dateTime, expOnset, actualOnset
 %   Tim Maniquet [27/3/24]
 
 % Helper function to determine the correct format for each input
-function format = formatVariable(var)
-    if ischar(var) || isstring(var)
-        format = '%s';
-    elseif isnumeric(var)
-        format = '%f';
+
+    % Ensure PTB-style format for numbers
+    if isnumeric(expOnset)
+        expOnsetStr = num2str(expOnset, '%.6f');
     else
-        error('Unsupported variable type: %s', class(var));
+        expOnsetStr = expOnset;
     end
-end
+    if isnumeric(actualOnset)
+        actualOnsetStr = num2str(actualOnset, '%.6f');
+    else
+        actualOnsetStr = actualOnset;
+    end
+    if isnumeric(delta)
+        deltaStr = num2str(delta, '%.6f');
+    else
+        deltaStr = delta;
+    end
 
-% Dynamically generate the format specifier
-formatSpec = sprintf('%s\t%s\t%s\t%s\t%s\t%s\t%s\n', ...
-                     formatVariable(eventType), ...
-                     formatVariable(eventName), ...
-                     formatVariable(dateTime), ...
-                     formatVariable(expOnset), ...
-                     formatVariable(actualOnset), ...
-                     formatVariable(delta), ...
-                     formatVariable(eventID));
+    % Convert all inputs to strings
+    eventTypeStr  = string(eventType);
+    eventNameStr  = string(eventName);
+    dateTimeStr   = string(dateTime);
+    eventIDStr    = string(eventID);
 
-% Create the log message line from the input using the specified format
-logMessage = sprintf(formatSpec, ...
-                    string(eventType), string(eventName), string(dateTime), ...
-                    expOnset, actualOnset, delta, ...
-                    string(eventID));
+  % Build a single line with tab separation
+    logLine = sprintf('%s\t%s\t%s\t%s\t%s\t%s\t%s\n', ...
+                      eventTypeStr, eventNameStr, dateTimeStr, ...
+                      expOnsetStr, actualOnsetStr, deltaStr, eventIDStr);
 
 % If the log file is not the command window
 if ~(logFile == 1)
