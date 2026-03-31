@@ -26,6 +26,8 @@ function [firstPressedKey, in] = logKeyPress(params, in, logFile, triggerKeyBrea
 
 firstPressedKey = []; % Initialize return value
 
+dateTimeStr = datestr(now, 'yyyy-mm-dd HH:MM:SS.FFF');
+
 % flush keyboard queue
 KbQueueFlush;
 
@@ -35,6 +37,11 @@ while conditionFunc(true)
     [pressed, firstPress] = KbQueueCheck(); % check keyboard queue
     
     keyCode = find(firstPress); % find the first key that was pressed
+    if ~isempty(keyCode)
+        keyName = KbName(keyCode(1));
+    else
+        keyName = '';
+    end
 
     % log the trigger key
     if pressed && firstPress(KbName(params.triggerKey))
