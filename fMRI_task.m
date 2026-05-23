@@ -377,16 +377,9 @@ try
 %% CATCH EXCEPTION
 catch exception
 
-    % Log the exception if it has been caught
-    % Get the full stack trace from the exception object
-    stackTrace = getReport(exception, 'extended', 'hyperlinks', 'off');
-    
-    % Log error message and stack trace to the log file
-    logEvent(logFile, 'ERROR','Err', dateTimeStr, '-', '-', '-', '-');
-    fprintf(logFile, 'Detailed error message:\n%s\n', stackTrace);
-    
-    % Also display the error message in the MATLAB Command Window
-    disp(['Error: ' stackTrace]);
+    % Log a clean abort (escape key) as 'ABORT'; log any genuine error as
+    % 'ERROR' with its full stack trace. See handleException.
+    handleException(logFile, exception);
 
 end
 %% SAVE AND CLOSE
