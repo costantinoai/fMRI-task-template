@@ -54,8 +54,8 @@ end
 % Check the resize mode
 if strcmpi(params.resizeMode, 'visualUnits')
     % Convert visual degrees to pixels
-    output_width_pixels = convertVisualUnits(width, 'deg', 'px');
-    output_height_pixels = convertVisualUnits(height, 'deg', 'px');
+    output_width_pixels = degToPix(width, params);
+    output_height_pixels = degToPix(height, params);
 elseif strcmpi(params.resizeMode, 'pixelSize')
     output_width_pixels = width;
     output_height_pixels = height;

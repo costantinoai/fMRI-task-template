@@ -44,7 +44,7 @@ if strcmp(params.fixType, 'round')
     rectSize = [outElement midElement centerElement];
     
     % Convert the element sizes from to pixels
-    fixSize = round(convertVisualUnits(rectSize, 'deg', 'px')); 
+    fixSize = round(degToPix(rectSize, params)); 
     
     % Initialize an array to store rectangle coordinates for drawing the fixation point
     fixRect = zeros(4, length(fixSize));
@@ -75,7 +75,7 @@ elseif strcmp(params.fixType, 'cross')
     fixCol = in.black;
     
     % Define the size and position of the fixation cross (in pixels)
-    crossLength = round(convertVisualUnits(params.fixSize, 'deg', 'px')); % Length of each arm of the cross
+    crossLength = round(degToPix(params.fixSize, params)); % Length of each arm of the cross
     crossWidth = round(crossLength/10); % Width of the cross lines
     centerX = winRect(3) / 2;
     centerY = winRect(4) / 2;
