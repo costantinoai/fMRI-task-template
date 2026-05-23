@@ -78,22 +78,9 @@ params = parseParameterFile('parameters.txt', fmriMode);
 
 %% USER INPUT: SUBJECT & RUN NUMBER
 
-% Declare subject number and decide on the run to start from
-if debugMode == true
-    % Default values for subject & run number in debug mode
-    answer = {'99', '1'};
-else
-    % Else if in actual experiment mode
-    prompt = {'subject number', sprintf('Run number (out of %d)', params.numRuns)};
-    % Define empty default answers
-    def = {'', ''};
-    % Collect user input
-    answer = inputdlg(prompt,'',1,def);
-end
-
-% Store the subject & run number in the 'input' structure
-in.subNum = str2double(answer{1});
-in.runNum = str2double(answer{2});
+% Get and validate the subject & run numbers (input dialog in experiment mode,
+% defaults in debug mode). Single source of truth: promptSubjectRun.
+[in.subNum, in.runNum] = promptSubjectRun(params, debugMode);
 
 % Save a timestamp in the input parameters
 in.timestamp = string(datetime('now', 'Format', 'yyyy-MM-dd_HHmmss'));
@@ -115,7 +102,7 @@ end
 % Prepares a subject- and run-specific directory to store outputs
 
 % Make a directory name with subject number if it doesn't exist yet
-in.resDir = fullfile(pwd, 'data', ['sub-' zeroFill(answer{1}, 2)]);
+in.resDir = fullfile(pwd, 'data', ['sub-' zeroFill(in.subNum, 2)]);
 
 % Check if the results directory exists & if we're not in debug mode
 if exist(in.resDir, 'dir') == 0 && debugMode == false
