@@ -64,10 +64,10 @@ function logEvent(logFile, eventType, eventName, dateTime, expOnset, actualOnset
 % If the log file is not the command window
 if ~(logFile == 1)
     % Log in the external log file
-    fprintf(logFile, logMessage);
+    fprintf(logFile, '%s', logMessage);
 end
 
 % In both cases, log in the command window
-fprintf(1, logMessage);
+fprintf(1, '%s', logMessage);
 
 end

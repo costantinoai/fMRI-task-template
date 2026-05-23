@@ -12,7 +12,7 @@ function dateTimeString = dateTimeStr()
 %   Tim Maniquet [27/3/24]
 
 % Extract the current date and time
-dateTimeString = char(datetime('now', 'Format', 'yyyy-MM-dd-HH-mm'));
+dateTimeString = char(datetime('now', 'Format', 'yyyy-MM-dd-HH-mm-ss'));
 
 
 end

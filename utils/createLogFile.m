@@ -42,6 +42,6 @@ logFileName = strcat(dateTimeStr, '_', runInfo, '_task-', params.taskName, '_log
 logFilePathName = fullfile(in.resDir, logFileName);
 
 % Initiate the log file by creating it in write mode
-logFile = fopen(logFilePathName, 'a');
+logFile = fopen(logFilePathName, 'w');
 
 end
