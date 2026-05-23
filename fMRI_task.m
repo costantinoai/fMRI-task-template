@@ -209,6 +209,7 @@ try
     %% TRIGGER WAIT
     
     % Display a message on screen while waiting for the scanner trigger
+    Screen('FillRect', win, gray);
     DrawFormattedText(win, params.triggerWaitText, 'center', 'center', black);
     
     % Display the message and log it
