@@ -153,7 +153,7 @@ try
     Screen(win, 'fillrect', gray);
     
     % Store the pixels per degree value for use in the setup
-    in.PPD = convertVisualUnits(1, 'deg', 'px');
+    in.PPD = degToPix(1, params);
    
     %% RUN-SPECIFIC PARAMETERS
     
